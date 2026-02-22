@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Intelligence Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080c14;
+      --surface: #0d1421;
+      --surface2: #09101c;
+      --border: #1e293b;
+      --border-dim: #131c2e;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --text-faint: #475569;
+      --text-ghost: #334155;
+      --accent: #0EA5E9;
+      --green: #10B981;
+      --amber: #F59E0B;
+      --purple: #8B5CF6;
+      --red: #EF4444;
+      --font: 'DM Mono', 'Fira Code', 'Courier New', monospace;
+      --serif: 'Instrument Serif', Georgia, serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0f1624; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+    /* HEADER */
+    .header {
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-label { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--text-faint); text-transform: uppercase; margin-bottom: 0.2rem; }
+    .header-title { font-family: var(--serif); font-size: 1.15rem; color: #f1f5f9; font-style: italic; }
+    .progress-wrap { display: flex; align-items: center; gap: 0.75rem; }
+    .progress-bar-track { width: 160px; height: 2px; background: var(--border); border-radius: 1px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 1px; transition: width 0.5s ease; width: 0%; }
+    .progress-label { font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.1em; }
+
+    /* MAIN */
+    .main { max-width: 900px; margin: 0 auto; padding: 2rem; }
+
+    /* API KEY */
+    .api-section { border: 1px solid var(--border-dim); border-radius: 4px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; background: var(--surface2); }
+    .api-section.unlocked { border-color: #14532d; background: #0a1a12; }
+    .section-label { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--text-faint); text-transform: uppercase; margin-bottom: 0.6rem; }
+    .api-row { display: flex; gap: 0.75rem; align-items: center; }
+    .api-input { flex: 1; background: transparent; border: 1px solid var(--border); border-radius: 3px; color: var(--text); font-family: var(--font); font-size: 0.78rem; padding: 0.5rem 0.75rem; letter-spacing: 0.05em; }
+    .api-input:focus { outline: none; border-color: var(--accent); }
+    .api-hint { font-size: 0.58rem; color: var(--text-dim); margin-top: 0.5rem; letter-spacing: 0.05em; }
+    .api-hint a { color: var(--accent); text-decoration: none; }
+    .api-hint a:hover { text-decoration: underline; }
+    .unlocked-badge { font-size: 0.6rem; color: var(--green); letter-spacing: 0.15em; text-transform: uppercase; }
+
+    /* PROBLEM */
+    .problem-section { border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem; margin-bottom: 2rem; background: var(--surface); }
+    .problem-textarea { width: 100%; background: transparent; border: none; color: var(--text); font-family: var(--font); font-size: 0.88rem; line-height: 1.6; padding: 0; resize: none; }
+    .problem-textarea:focus { outline: none; }
+    .problem-textarea::placeholder { color: var(--text-ghost); }
+    .problem-textarea:disabled { opacity: 0.5; }
+    .btn-row { margin-top: 1.25rem; display: flex; gap: 0.75rem; }
+
+    /* BUTTONS */
+    .btn { border: none; padding: 0.6rem 1.5rem; border-radius: 3px; font-size: 0.68rem; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; font-family: var(--font); transition: opacity 0.2s, transform 0.1s; }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-stop { background: transparent; color: var(--red); border: 1px solid var(--red); }
+    .btn-amber { background: var(--amber); color: #000; }
+    .btn-purple { background: var(--purple); color: #fff; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+    .btn-sm { padding: 0.4rem 1rem; font-size: 0.62rem; }
+
+    /* STEP CARDS */
+    .steps { display: flex; flex-direction: column; gap: 1px; }
+    .step-card { border: 1px solid var(--border-dim); border-radius: 3px; background: var(--surface2); transition: border-color 0.3s, background 0.3s; overflow: hidden; }
+    .step-card:hover { border-color: var(--border) !important; }
+    .step-card.running { background: rgba(14,165,233,0.04); }
+    .step-card.completed { background: var(--surface); border-color: var(--border); }
+    .step-header { padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; cursor: default; }
+    .step-header.clickable { cursor: pointer; }
+    .step-indicator { flex-shrink: 0; width: 20px; text-align: center; font-size: 0.75rem; }
+    .step-info { flex: 1; }
+    .step-name { font-size: 0.68rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-ghost); transition: color 0.3s; }
+    .step-name.active { color: var(--accent); }
+    .step-name.done { color: var(--text-muted); }
+    .step-generating { font-size: 0.58rem; color: var(--text-faint); margin-top: 0.2rem; letter-spacing: 0.1em; }
+    .step-chevron { color: var(--text-ghost); font-size: 0.7rem; transition: transform 0.2s; }
+    .step-chevron.open { transform: rotate(180deg); }
+    .step-content { border-top: 1px solid var(--border); padding: 1.25rem 1.5rem 1.5rem; font-size: 0.81rem; line-height: 1.7; display: none; animation: slideIn 0.35s ease forwards; }
+    .step-content.visible { display: block; }
+    .step-accent-bar { width: 2rem; height: 2px; margin-bottom: 1rem; border-radius: 1px; }
+
+    .result-header { color: var(--text-muted); font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; margin: 1rem 0 0.4rem; font-weight: 600; }
+    .result-bullet { display: flex; gap: 0.5rem; margin: 0.25rem 0; padding-left: 0.5rem; }
+    .result-bullet-dash { color: var(--text-dim); flex-shrink: 0; }
+    .result-bullet-text { color: #e2e8f0; line-height: 1.6; }
+    .result-numbered { display: flex; gap: 0.5rem; margin: 0.3rem 0; padding-left: 0.5rem; }
+    .result-num { color: var(--text-muted); flex-shrink: 0; font-size: 0.78rem; padding-top: 2px; }
+    .result-p { color: #cbd5e1; line-height: 1.7; margin: 0.2rem 0; }
+
+    /* DONE BANNER */
+    .done-banner { margin-top: 2rem; border: 1px solid #14532d; border-radius: 3px; padding: 1.25rem 1.5rem; background: #0a1a12; display: flex; align-items: center; justify-content: space-between; animation: slideIn 0.4s ease forwards; }
+    .done-label { font-size: 0.58rem; letter-spacing: 0.2em; color: #16a34a; text-transform: uppercase; margin-bottom: 0.25rem; }
+    .done-text { font-size: 0.78rem; color: #4ade80; }
+    .done-count { font-size: 0.62rem; color: #166534; letter-spacing: 0.1em; }
+
+    .error-banner { margin-top: 1rem; border: 1px solid #7f1d1d; border-radius: 3px; padding: 1rem 1.25rem; background: #0f0a0a; font-size: 0.73rem; color: #f87171; letter-spacing: 0.04em; }
+
+    /* ── STEP 12: DELIVERABLES ─────────────────────────────── */
+    .deliverables-section { margin-top: 2rem; animation: slideIn 0.5s ease forwards; }
+    .deliverables-heading { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--text-faint); text-transform: uppercase; margin-bottom: 1rem; padding-left: 0.25rem; }
+    .deliverables-intro { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 1.25rem; line-height: 1.5; }
+    .deliverables-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
+    @media (max-width: 600px) { .deliverables-grid { grid-template-columns: 1fr; } }
+
+    .deliverable-card { border: 1px solid var(--border-dim); border-radius: 3px; background: var(--surface2); overflow: hidden; transition: border-color 0.3s; }
+    .deliverable-card:hover { border-color: var(--border); }
+    .deliverable-card.generating-proto { border-color: var(--amber); background: rgba(245,158,11,0.04); }
+    .deliverable-card.generating-prd { border-color: var(--purple); background: rgba(139,92,246,0.04); }
+    .deliverable-card.card-done { border-color: var(--border); background: var(--surface); }
+
+    .deliverable-header { padding: 1.25rem 1.25rem 1rem; }
+    .deliverable-icon { font-size: 1.4rem; margin-bottom: 0.6rem; }
+    .deliverable-title { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.3rem; }
+    .deliverable-desc { font-size: 0.71rem; color: var(--text-dim); line-height: 1.5; }
+    .deliverable-actions { padding: 0 1.25rem 1.25rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .deliverable-status { font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.08em; }
+
+    /* PROTOTYPE PREVIEW */
+    .prototype-preview { margin: 0 1.25rem 1.25rem; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+    .prototype-preview-bar { background: #111827; padding: 0.5rem 0.75rem; display: flex; align-items: center; gap: 0.4rem; border-bottom: 1px solid var(--border); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot-red { background: #EF4444; }
+    .dot-amber { background: #F59E0B; }
+    .dot-green { background: #10B981; }
+    .prototype-frame { width: 100%; height: 400px; border: none; background: #fff; display: block; }
+
+    /* PRD PREVIEW */
+    .prd-preview { margin: 0 1.25rem 1.25rem; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); padding: 1rem 1.25rem; max-height: 400px; overflow-y: auto; font-size: 0.78rem; line-height: 1.7; }
+
+    /* FEEDBACK BAR */
+    .feedback-bar { border-top: 1px solid var(--border-dim); padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; background: var(--surface2); }
+    .feedback-bar.open { flex-direction: column; align-items: stretch; }
+    .feedback-bar-row { display: flex; gap: 0.75rem; align-items: center; }
+    .feedback-textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); font-family: var(--font); font-size: 0.75rem; padding: 0.5rem 0.75rem; resize: none; line-height: 1.5; margin-top: 0.5rem; }
+    .feedback-textarea:focus { outline: none; border-color: var(--accent); }
+    .feedback-textarea::placeholder { color: var(--text-ghost); }
+    .note-badge { font-size: 0.58rem; color: var(--amber); letter-spacing: 0.1em; padding: 0.18rem 0.5rem; border: 1px solid rgba(245,158,11,0.4); border-radius: 2px; }
+
+    /* FOOTER */
+    .footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-dim); display: flex; justify-content: space-between; align-items: center; }
+    .footer span { font-size: 0.58rem; color: var(--border); letter-spacing: 0.13em; text-transform: uppercase; }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    @keyframes slideIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    .pulse { animation: pulse 1.4s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <div class="header-label">Product Intelligence Agent</div>
+    <div class="header-title">Framework Runner</div>
+  </div>
+  <div id="headerRight"></div>
+</header>
+
+<main class="main">
+
+  <!-- API KEY -->
+  <div class="api-section" id="apiSection">
+    <div class="section-label">Anthropic API Key</div>
+    <div class="api-row">
+      <input type="password" class="api-input" id="apiKeyInput" placeholder="sk-ant-..." />
+      <button class="btn btn-primary" onclick="saveApiKey()">Unlock</button>
+    </div>
+    <div class="api-hint">
+      Your key stays in your browser only — never stored or shared. Get a free key (includes $5 credit) at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+    </div>
+  </div>
+
+  <!-- PROBLEM STATEMENT -->
+  <div class="problem-section">
+    <div class="section-label">Problem Statement</div>
+    <textarea id="problemInput" class="problem-textarea" rows="3" placeholder="Enter the problem statement..."></textarea>
+    <div class="btn-row" id="btnRow">
+      <button class="btn btn-primary" id="runBtn" onclick="runFramework()" disabled>▶ Run Framework</button>
+    </div>
+  </div>
+
+  <!-- STEPS 1–11 -->
+  <div class="steps" id="stepsContainer"></div>
+
+  <!-- DONE / ERROR -->
+  <div id="doneBanner" style="display:none"></div>
+  <div id="errorBanner" style="display:none" class="error-banner"></div>
+
+  <!-- STEP 11: DELIVERABLES (always visible, unlocks after framework runs) -->
+  <div id="deliverablesSection" class="deliverables-section">
+    <div class="deliverables-heading">11 — Generate Deliverables</div>
+    <div class="deliverables-intro" id="deliverablesIntro">Run the framework above to unlock prototype and PRD generation.</div>
+    <div class="deliverables-grid">
+
+      <!-- PROTOTYPE -->
+      <div class="deliverable-card" id="protoCard">
+        <div class="deliverable-header">
+          <div class="deliverable-icon" id="protoIcon" style="opacity:0.3">⬡</div>
+          <div class="deliverable-title">Interactive Prototype</div>
+          <div class="deliverable-desc">A clickable HTML mockup of the top solution built from your full framework output. Download and open in any browser.</div>
+        </div>
+        <div class="deliverable-actions" id="protoActions">
+          <button class="btn btn-amber btn-sm" id="protoBtn" onclick="generatePrototype()" disabled style="opacity:0.35;cursor:not-allowed">▶ Yes, Generate Prototype</button>
+        </div>
+      </div>
+
+      <!-- PRD -->
+      <div class="deliverable-card" id="prdCard">
+        <div class="deliverable-header">
+          <div class="deliverable-icon" id="prdIcon" style="opacity:0.3">◧</div>
+          <div class="deliverable-title">Product Requirements Doc</div>
+          <div class="deliverable-desc">A structured PRD with user stories, requirements, and success metrics — ready to share with engineers or stakeholders.</div>
+        </div>
+        <div class="deliverable-actions" id="prdActions">
+          <button class="btn btn-purple btn-sm" id="prdBtn" onclick="generatePRD()" disabled style="opacity:0.35;cursor:not-allowed">▶ Yes, Generate PRD</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>Powered by Claude — Anthropic</span>
+    <span>Segments → Pain Points → Problem → Hypothesis → Solutions → ML → Data → RICE → Risks → Metrics → Deliverables</span>
+  </div>
+
+</main>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let apiKey = '';
+let abortFlag = false;
+let status = 'idle';
+let results = {};
+let completedSteps = [];
+let expandedStep = null;
+let userNotes = [];       // accumulated feedback from user
+let stepResolve = null;   // resolves the pause-per-step promise
+
+const STEP_COLORS = [
+  '#0EA5E9','#8B5CF6','#EC4899','#F59E0B',
+  '#10B981','#6366F1','#F97316','#3B82F6',
+  '#EF4444','#14B8A6','#A855F7'
+];
+
+// ─── PRODUCT TYPE DETECTION ───────────────────────────────────────────────────
+// Detects: marketplace_2sided, marketplace_3sided, consumer_app, b2b_saas, platform, other
+function detectProductType(problem) {
+  const p = problem.toLowerCase();
+  const marketplaceSignals = ['marketplace', 'platform for', 'connect', 'between', 'buyers and sellers', 'supply and demand', 'two-sided', 'host', 'freelance', 'gig', 'rent', 'hire', 'book'];
+  const b2bSignals = ['enterprise', 'b2b', 'businesses', 'companies', 'saas', 'software for', 'tool for teams', 'workflow'];
+  const consumerSignals = ['app', 'consumer', 'users', 'people who', 'social', 'personal'];
+  if (marketplaceSignals.some(s => p.includes(s))) return 'marketplace';
+  if (b2bSignals.some(s => p.includes(s))) return 'b2b_saas';
+  if (consumerSignals.some(s => p.includes(s))) return 'consumer_app';
+  return 'general';
+}
+
+// ─── FRAMEWORK STEPS ─────────────────────────────────────────────────────────
+const STEPS = [
+  {
+    id: 'segments', label: '01 — Customer Segments', icon: '◎',
+    prompt: (p) => {
+      const type = detectProductType(p);
+      if (type === 'marketplace') {
+        return `You are a senior PM in a product interview. Given: "${p}"
+
+This is a MARKETPLACE — it is two-sided by nature. You MUST segment both sides separately.
+
+SUPPLY SIDE (who provides value / sellers / creators / hosts):
+- [Segment name]: [who they are] | Behaviour: [key trait] | Motivation: [why they join the marketplace]
+- [Segment name]: [who they are] | Behaviour: [key trait] | Motivation: [why they join the marketplace]
+
+DEMAND SIDE (who consumes value / buyers / fans / customers):
+- [Segment name]: [who they are] | Behaviour: [key trait] | Motivation: [why they use the marketplace]
+- [Segment name]: [who they are] | Behaviour: [key trait] | Motivation: [why they use the marketplace]
+
+Also note:
+- Chicken-and-egg risk: [which side is harder to acquire first and why]
+- Constrained side: [which side limits marketplace growth]
+
+Bullet points only. No prose. Max 200 words.`;
+      }
+      if (type === 'b2b_saas') {
+        return `You are a senior PM in a product interview. Given: "${p}"
+
+This is a B2B product — segment by both BUYER (who pays) and USER (who uses it) separately.
+
+BUYERS (decision makers / economic buyers):
+- [Segment name]: [role/company type] | Behaviour: [how they evaluate tools] | Motivation: [business outcome they care about]
+- [Segment name]: [role/company type] | Behaviour: [how they evaluate tools] | Motivation: [business outcome they care about]
+
+USERS (day-to-day operators):
+- [Segment name]: [role] | Behaviour: [how they work] | Motivation: [what makes their job easier]
+- [Segment name]: [role] | Behaviour: [how they work] | Motivation: [what makes their job easier]
+
+Also note:
+- Buying committee note: [who else influences the purchase]
+
+Bullet points only. No prose. Max 180 words.`;
+      }
+      return `You are a senior PM in a product interview. Given: "${p}"
+
+List 3-4 customer segments as bullets. For each:
+- [Segment name]: [who they are] | Behaviour: [key trait] | Motivation: [why they care]
+
+Be specific and behavioural, not just demographic. Bullet points only. No paragraphs. Max 150 words.`;
+    }
+  },
+  {
+    id: 'painpoints', label: '02 — Pain Points by Segment', icon: '⚡',
+    prompt: (p, prev) => {
+      const type = detectProductType(p);
+      if (type === 'marketplace') {
+        return `You are a senior PM in a product interview.
+Segments: ${prev.segments}
+
+This is a marketplace. List pain points for BOTH sides separately. For each segment, 2 pain points:
+
+SUPPLY SIDE:
+[Segment name]:
+- [Pain point]: [one sentence why it hurts] — Severity: High/Med/Low
+- [Pain point]: [one sentence why it hurts] — Severity: High/Med/Low
+
+DEMAND SIDE:
+[Segment name]:
+- [Pain point]: [one sentence why it hurts] — Severity: High/Med/Low
+- [Pain point]: [one sentence why it hurts] — Severity: High/Med/Low
+
+Also:
+- Liquidity problem: [specific friction between supply and demand meeting]
+
+Bullet points only. Max 180 words.`;
+      }
+      return `You are a senior PM in a product interview.
+Segments: ${prev.segments}
+
+For each segment list 2 pain points as bullets:
+[Segment name]:
+- [Pain point]: [one sentence why it hurts] — Severity: High/Med/Low
+- [Pain point]: [one sentence why it hurts] — Severity: High/Med/Low
+
+Bullet points only. No intros. Max 150 words.`;
+    }
+  },
+  {
+    id: 'problemstatement', label: '03 — Problem Statement', icon: '◐',
+    prompt: (p, prev) => {
+      const type = detectProductType(p);
+      if (type === 'marketplace') {
+        return `You are a senior PM in a product interview. Given: "${p}"
+Segments: ${prev.segments}
+Pain points: ${prev.painpoints}
+
+Output as bullets:
+- SUPPLY PROBLEM: [what supply side can't do and why]
+- DEMAND PROBLEM: [what demand side can't do and why]
+- MARKETPLACE GAP: [why existing solutions fail to connect them]
+- OUR ADVANTAGE: [unique data or network effect we can build]
+- WHY NOW: [timing — what's changed in market/tech/behaviour]
+
+Bullet points only. Max 100 words.`;
+      }
+      return `You are a senior PM in a product interview. Given: "${p}"
+Segments: ${prev.segments}
+
+Output as bullets:
+- WHO: [primary user segment]
+- PROBLEM: [what they can't do and why]
+- COST: [consequence of the problem]
+- ADVANTAGE: [why we're uniquely placed to solve this]
+- WHY NOW: [one sentence on timing]
+
+Bullet points only. Max 80 words.`;
+    }
+  },
+  {
+    id: 'hypothesis', label: '04 — Hypothesis', icon: '◈',
+    prompt: (p, prev) => {
+      const type = detectProductType(p);
+      if (type === 'marketplace') {
+        return `You are a senior PM in a product interview.
+Problem: ${prev.problemstatement}
+
+For a marketplace, hypotheses must address both sides and the matching mechanism. Output as bullets:
+- H1 (Supply acquisition): "We believe [X supply segment] will join if [condition] because [signal]. Validated if [metric]."
+- H2 (Demand conversion): "We believe [X demand segment] will transact if [condition] because [signal]. Validated if [metric]."
+- H3 (Liquidity): "We believe [matching mechanism] will drive [outcome] because [signal]. Validated if [metric]."
+- Priority: [which to test first — usually supply side — and why]
+
+Bullet points only. Max 120 words.`;
+      }
+      return `You are a senior PM in a product interview.
+Problem: ${prev.problemstatement}
+
+Output 2 hypotheses as bullets:
+- H1 (User Behaviour): "We believe [X] because [signal]. Validated if [metric]."
+- H2 (Product Mechanism): "We believe [X] because [signal]. Validated if [metric]."
+- Priority: [which to test first and one-line reason]
+
+Bullet points only. Max 100 words.`;
+    }
+  },
+  {
+    id: 'solutions', label: '05 — Solution Options', icon: '◆',
+    prompt: (p, prev) => {
+      const type = detectProductType(p);
+      if (type === 'marketplace') {
+        return `You are a senior PM in a product interview. Given: "${p}"
+Segments: ${prev.segments}
+
+For a marketplace, solutions must address supply, demand, or the matching layer. List 4 solutions as bullets:
+- [Solution name]: [what it does] | Solves: Supply/Demand/Matching | Complexity: Low/Med/High | Value: Quick/Medium/Long | Type: Incremental/Differentiated/Category-creating
+
+Include:
+- One supply-side acquisition solution
+- One demand-side conversion solution
+- One matching/discovery solution
+- One ML/network-effect solution
+
+Also note:
+- Chicken-and-egg strategy: [which side to seed first and how]
+
+Bullet points only. Max 200 words.`;
+      }
+      return `You are a senior PM in a product interview. Given: "${p}"
+
+List 4 solutions as bullets. For each:
+- [Solution name]: [one sentence what it does] | Segment: X | Complexity: Low/Med/High | Value: Quick/Medium/Long | Type: Incremental/Differentiated/Category-creating
+
+Include one ML/data-moat solution. Bullet points only. Max 150 words.`;
+    }
+  },
+  {
+    id: 'ml_opportunities', label: '06 — ML Opportunity Mapping', icon: '◈',
+    prompt: (p, prev) => {
+      const type = detectProductType(p);
+      if (type === 'marketplace') {
+        return `You are a senior PM who understands ML. Solutions: ${prev.solutions}
+
+For a marketplace, ML creates value primarily in matching, pricing, and fraud detection. For each solution:
+- [Solution]: ML needed? Yes/No/Optional | Type: [e.g. recommendation, dynamic pricing, fraud detection, NLP ranking] | Data moat: [what this platform uniquely learns over time]
+
+Then:
+- Top ML bet: [solution name]
+- What it learns: [what signal improves with more transactions]
+- Network effect: [how more supply/demand data improves the model]
+- Cold start approach: [how to handle new users/listings with no history]
+
+Bullet points only. Max 150 words.`;
+      }
+      return `You are a senior PM who understands ML. Solutions: ${prev.solutions}
+
+For each solution:
+- [Solution]: ML needed? Yes/No/Optional | Type: [ML type if yes] | Data moat: [unique platform advantage]
+
+Then:
+- Top ML bet: [solution name]
+- What it predicts: [one sentence]
+- Why it's defensible: [one sentence]
+
+Bullet points only. Max 130 words.`;
+    }
+  },
+  {
+    id: 'data_strategy', label: '07 — Data & Feature Strategy', icon: '◆',
+    prompt: (p, prev) => {
+      const type = detectProductType(p);
+      if (type === 'marketplace') {
+        return `You are a senior PM who understands ML. Top ML solution: ${prev.ml_opportunities}
+
+For a marketplace ML model, list features from BOTH sides of the market:
+
+Supply-side features:
+- [Specific signal] e.g. "response rate within 1 hour over last 30 days" ⚠ if proxy risk
+
+Demand-side features:
+- [Specific signal] e.g. "number of searches before first booking" ⚠ if proxy risk
+
+Matching features:
+- [Specific signal] e.g. "category overlap between supply listing tags and demand search terms"
+
+Cold Start:
+- New supply: [how to score new listings with no transaction history]
+- New demand: [how to personalise for new users with no behaviour]
+
+Bullet points only. Max 150 words.`;
+      }
+      return `You are a senior PM who understands ML. Top ML solution: ${prev.ml_opportunities}
+
+Features:
+- [Specific feature 1] ⚠ if proxy risk
+- [Specific feature 2]
+- [Specific feature 3]
+- [Specific feature 4]
+- [Specific feature 5]
+
+Cold Start:
+- [How to handle new users — 2 bullets]
+
+Be concrete (e.g. "ratio of 5-star to 1-star reviews in last 12 months"). Max 100 words.`;
+    }
+  },
+  {
+    id: 'prioritisation', label: '08 — RICE Prioritisation', icon: '◉',
+    prompt: (p, prev) => `You are a senior PM in a product interview. Solutions: ${prev.solutions}
+
+Output a RICE scoring table with ALL rows filled. RICE Score = (Reach × Impact × Confidence) / Effort:
+
+| Solution | Reach (1-10) | Impact (1-10) | Confidence (1-10) | Effort (1-10) | RICE Score |
+|---|---|---|---|---|---|
+| [Solution 1] | X | X | X | X | XX.X |
+| [Solution 2] | X | X | X | X | XX.X |
+| [Solution 3] | X | X | X | X | XX.X |
+| [Solution 4] | X | X | X | X | XX.X |
+
+Then bullets:
+- Recommended sequence: [which to build first and why]
+- Strategic note: [any low-RICE solution still worth building for strategic reasons]`
+  },
+  {
+    id: 'tradeoffs', label: '09 — Tradeoffs & Risks', icon: '◯',
+    prompt: (p, prev) => {
+      const type = detectProductType(p);
+      if (type === 'marketplace') {
+        return `You are a senior PM in a product interview. Top solutions: ${prev.prioritisation}
+
+For a marketplace, risks must include supply-demand balance risks. For the top 2 solutions:
+
+[Solution 1 name]:
+- [Risk type]: [one frank sentence]
+- [Risk type]: [one frank sentence]
+- Marketplace-specific risk: [disintermediation / liquidity collapse / side-switching]
+
+[Solution 2 name]:
+- [Risk type]: [one frank sentence]
+- [Risk type]: [one frank sentence]
+- Marketplace-specific risk: [disintermediation / liquidity collapse / side-switching]
+
+Risk types: Technical, ML, Adoption, Regulatory, Competitive, Liquidity, Disintermediation. Max 140 words.`;
+      }
+      return `You are a senior PM in a product interview. Top solutions: ${prev.prioritisation}
+
+For the top 2 solutions:
+
+[Solution 1 name]:
+- [Risk type]: [one frank sentence]
+- [Risk type]: [one frank sentence]
+
+[Solution 2 name]:
+- [Risk type]: [one frank sentence]
+- [Risk type]: [one frank sentence]
+
+Risk types: Technical, ML, Adoption, Regulatory, Competitive. Bullet points only. Max 120 words.`;
+    }
+  },
+  {
+    id: 'metrics', label: '10 — Success Metrics', icon: '◎',
+    prompt: (p, prev) => {
+      const type = detectProductType(p);
+      if (type === 'marketplace') {
+        return `You are a senior PM in a product interview. Given: "${p}"
+
+For a marketplace, use marketplace-specific industry metrics. Format each as: [Metric]: [definition] → In this context: [how it applies specifically here]
+
+NORTH STAR:
+- GMV (Gross Merchandise Value) or Liquidity Rate: [definition] → [specific context]
+
+SUPPLY-SIDE METRICS:
+- Supply activation rate: [definition] → [specific context]
+- Average listing quality score: [definition] → [specific context]
+
+DEMAND-SIDE METRICS:
+- Conversion rate (browse to transaction): [definition] → [specific context]
+- Repeat purchase rate / retention: [definition] → [specific context]
+
+MARKETPLACE HEALTH:
+- Take rate: [definition] → [specific context]
+- Time to match (supply meets demand): [definition] → [specific context]
+
+GUARDRAIL:
+- Disintermediation rate / NPS: [definition] → [specific context]
+
+Monday morning I'd check: [metric name and why it signals marketplace health]
+
+Max 200 words.`;
+      }
+      return `You are a senior PM in a product interview. Given: "${p}"
+
+Use ONLY industry-standard metrics (bounce rate, churn rate, DAU/MAU, conversion rate, adoption rate, retention rate, NPS, LTV, CAC, activation rate). For each: [Metric]: [what it measures] → In this context: [specific application]
+
+NORTH STAR:
+- [Metric]: [definition] → [specific context]
+
+LEADING INDICATORS:
+- [Metric]: [definition] → [specific context]
+- [Metric]: [definition] → [specific context]
+
+LAGGING INDICATORS:
+- [Metric]: [definition] → [specific context]
+- [Metric]: [definition] → [specific context]
+
+GUARDRAIL:
+- [Metric]: [definition] → [specific context]
+
+Monday morning I'd check: [metric and why]
+
+Max 180 words.`;
+    }
+  }
+];
+
+// ─── API KEY ──────────────────────────────────────────────────────────────────
+function saveApiKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val.startsWith('sk-')) { alert('Please enter a valid Anthropic API key (starts with sk-)'); return; }
+  apiKey = val;
+  const section = document.getElementById('apiSection');
+  section.classList.add('unlocked');
+  section.innerHTML = `<div class="section-label">API Key</div><div class="unlocked-badge">✓ Unlocked — ready to run</div>`;
+  updateRunBtn();
+}
+
+function updateRunBtn() {
+  const btn = document.getElementById('runBtn');
+  if (!btn) return;
+  const problem = document.getElementById('problemInput').value.trim();
+  btn.disabled = !apiKey || !problem || status === 'running';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('problemInput').addEventListener('input', updateRunBtn);
+  renderSteps();
+});
+
+// ─── RENDER STEPS ─────────────────────────────────────────────────────────────
+function renderSteps() {
+  const container = document.getElementById('stepsContainer');
+  container.innerHTML = '';
+  STEPS.forEach((step, idx) => {
+    const color = STEP_COLORS[idx];
+    const div = document.createElement('div');
+    div.className = 'step-card';
+    div.id = `card-${step.id}`;
+    div.innerHTML = `
+      <div class="step-header" id="header-${step.id}">
+        <div class="step-indicator" id="indicator-${step.id}"><span style="color:#1e293b">${step.icon}</span></div>
+        <div class="step-info"><div class="step-name" id="name-${step.id}">${step.label}</div></div>
+      </div>
+      <div class="step-content" id="content-${step.id}">
+        <div class="step-accent-bar" style="background:${color}"></div>
+        <div id="result-${step.id}"></div>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+function markRunning(stepId, color) {
+  const card = document.getElementById(`card-${stepId}`);
+  card.className = 'step-card running';
+  card.style.borderColor = color;
+  document.getElementById(`indicator-${stepId}`).innerHTML = `<span class="pulse" style="color:${color}">◉</span>`;
+  const nameEl = document.getElementById(`name-${stepId}`);
+  nameEl.className = 'step-name active';
+  if (!nameEl.parentElement.querySelector('.step-generating')) {
+    const g = document.createElement('div');
+    g.className = 'step-generating'; g.textContent = 'Generating...';
+    nameEl.parentElement.appendChild(g);
+  }
+}
+
+function markCompleted(stepId, color, text) {
+  const card = document.getElementById(`card-${stepId}`);
+  card.className = 'step-card completed'; card.style.borderColor = '#1e293b';
+  document.getElementById(`indicator-${stepId}`).innerHTML = `<span style="color:${color}">✓</span>`;
+  const nameEl = document.getElementById(`name-${stepId}`);
+  nameEl.className = 'step-name done';
+  const g = nameEl.parentElement.querySelector('.step-generating');
+  if (g) g.remove();
+  document.getElementById(`result-${stepId}`).innerHTML = formatResult(text);
+  const header = document.getElementById(`header-${stepId}`);
+  header.classList.add('clickable');
+  if (!header.querySelector('.step-chevron')) {
+    const chev = document.createElement('span');
+    chev.className = 'step-chevron open'; chev.textContent = '▾';
+    header.appendChild(chev);
+  }
+  header.onclick = () => toggleStep(stepId);
+  expandStep(stepId);
+  // Add feedback bar
+  const content = document.getElementById(`content-${stepId}`);
+  const bar = document.createElement('div');
+  bar.className = 'feedback-bar'; bar.id = `feedback-${stepId}`;
+  bar.innerHTML = `
+    <div class="feedback-bar-row">
+      <button class="btn btn-primary btn-sm" onclick="continueStep('${stepId}', false)">✓ Continue</button>
+      <button class="btn btn-outline btn-sm" onclick="openFeedback('${stepId}')">✎ Add note before continuing</button>
+    </div>`;
+  content.appendChild(bar);
+}
+
+function openFeedback(stepId) {
+  const bar = document.getElementById(`feedback-${stepId}`);
+  bar.classList.add('open');
+  bar.innerHTML = `
+    <div class="feedback-bar-row" style="margin-bottom:0.4rem">
+      <span style="font-size:0.65rem;color:var(--text-dim);letter-spacing:0.08em">Your note — will carry into all remaining steps</span>
+    </div>
+    <textarea class="feedback-textarea" id="note-${stepId}" rows="2" placeholder="e.g. Focus on enterprise customers only, ignore SMBs..."></textarea>
+    <div class="feedback-bar-row" style="margin-top:0.5rem">
+      <button class="btn btn-primary btn-sm" onclick="continueStep('${stepId}', true)">✓ Continue with note</button>
+      <button class="btn btn-outline btn-sm" onclick="continueStep('${stepId}', false)">✕ Cancel, just continue</button>
+    </div>`;
+  document.getElementById(`note-${stepId}`).focus();
+}
+
+function continueStep(stepId, withNote) {
+  if (withNote) {
+    const noteEl = document.getElementById(`note-${stepId}`);
+    const noteText = noteEl ? noteEl.value.trim() : '';
+    if (noteText) {
+      userNotes.push({ stepId, note: noteText });
+      // Show badge in step header
+      const nameEl = document.getElementById(`name-${stepId}`);
+      if (nameEl && !nameEl.parentElement.querySelector('.note-badge')) {
+        const badge = document.createElement('span');
+        badge.className = 'note-badge'; badge.textContent = '📝 note added';
+        badge.style.marginLeft = '0.5rem';
+        nameEl.parentElement.appendChild(badge);
+      }
+    }
+  }
+  // Replace feedback bar with a slim "noted" indicator
+  const bar = document.getElementById(`feedback-${stepId}`);
+  if (bar) bar.remove();
+  // Resolve the pause
+  if (stepResolve) { stepResolve(); stepResolve = null; }
+}
+
+// Pauses the framework loop — resolves when user clicks continue
+function waitForUserContinue() {
+  return new Promise(resolve => { stepResolve = resolve; });
+}
+
+// Build the accumulated notes context string for injection into prompts
+function getNotesContext() {
+  if (!userNotes.length) return '';
+  return '\n\nPM FEEDBACK TO INCORPORATE:\n' + userNotes.map(n => `- [After step ${n.stepId}]: ${n.note}`).join('\n') + '\nTake all of the above feedback into account in your response.';
+}
+
+function expandStep(id) {
+  if (expandedStep && expandedStep !== id) collapseStep(expandedStep);
+  expandedStep = id;
+  document.getElementById(`content-${id}`).classList.add('visible');
+  const c = document.getElementById(`header-${id}`).querySelector('.step-chevron');
+  if (c) c.classList.add('open');
+}
+
+function collapseStep(id) {
+  document.getElementById(`content-${id}`).classList.remove('visible');
+  const c = document.getElementById(`header-${id}`).querySelector('.step-chevron');
+  if (c) c.classList.remove('open');
+}
+
+function toggleStep(id) {
+  if (expandedStep === id) { collapseStep(id); expandedStep = null; }
+  else expandStep(id);
+}
+
+// ─── FORMAT RESULT ────────────────────────────────────────────────────────────
+function formatResult(text) {
+  // Detect markdown table blocks and render them as HTML tables
+  const lines = text.split('\n');
+  const output = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // Check if this is a table row
+    if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+      // Collect all table lines
+      const tableLines = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      // Build HTML table
+      let tableHtml = '<div style="overflow-x:auto;margin:0.75rem 0"><table style="width:100%;border-collapse:collapse;font-size:0.75rem">';
+      tableLines.forEach((tl, ti) => {
+        if (tl.replace(/[\|\s\-]/g,'').length === 0) return; // skip separator row
+        const cells = tl.split('|').filter((_,ci) => ci > 0 && ci < tl.split('|').length - 1);
+        const tag = ti === 0 ? 'th' : 'td';
+        const rowStyle = ti === 0 ? 'background:#0d1421' : (ti % 2 === 0 ? 'background:#09101c' : 'background:#0b1219');
+        tableHtml += `<tr style="${rowStyle}">`;
+        cells.forEach(cell => {
+          tableHtml += `<${tag} style="padding:0.45rem 0.75rem;border:1px solid #1e293b;color:${ti===0?'#94a3b8':'#cbd5e1'};text-align:left;white-space:nowrap">${escHtml(cell.trim().replace(/\*\*/g,''))}</${tag}>`;
+        });
+        tableHtml += '</tr>';
+      });
+      tableHtml += '</table></div>';
+      output.push(tableHtml);
+      continue;
+    }
+    // Normal line rendering
+    if (!line.trim()) { output.push('<div style="height:0.5rem"></div>'); i++; continue; }
+    if (line.startsWith('- ') || line.startsWith('• ')) {
+      output.push(`<div class="result-bullet"><span class="result-bullet-dash">—</span><span class="result-bullet-text">${escHtml(line.replace(/^[-•]\s/,'').replace(/\*\*/g,''))}</span></div>`);
+      i++; continue;
+    }
+    if (/^\d+\.\s/.test(line)) {
+      const num = line.match(/^\d+/)[0];
+      output.push(`<div class="result-numbered"><span class="result-num">${num}.</span><span class="result-bullet-text">${escHtml(line.replace(/^\d+\.\s/,'').replace(/\*\*/g,''))}</span></div>`);
+      i++; continue;
+    }
+    const clean = line.replace(/\*\*/g,'');
+    const isH = line.startsWith('#') || (line.endsWith(':') && line.length < 60 && !line.startsWith(' '));
+    if (isH) { output.push(`<div class="result-header">${escHtml(clean.replace(/^#+\s/,''))}</div>`); i++; continue; }
+    output.push(`<p class="result-p">${escHtml(clean)}</p>`);
+    i++;
+  }
+  return output.join('');
+}
+
+// markdown-aware formatter for PRD
+function formatPRD(text) {
+  return text.split('\n').map(line => {
+    if (!line.trim()) return '<div style="height:0.4rem"></div>';
+    if (line.startsWith('# ')) return `<div style="color:#f1f5f9;font-size:0.9rem;font-family:var(--serif);font-style:italic;margin:0.5rem 0 0.75rem">${escHtml(line.replace(/^#\s/,''))}</div>`;
+    if (line.startsWith('## ')) return `<div style="color:#8B5CF6;font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;margin:1rem 0 0.4rem;font-weight:600;border-top:1px solid #1e293b;padding-top:0.75rem">${escHtml(line.replace(/^##\s/,''))}</div>`;
+    if (line.startsWith('- ') || line.startsWith('• '))
+      return `<div class="result-bullet"><span class="result-bullet-dash">—</span><span class="result-bullet-text">${escHtml(line.replace(/^[-•]\s/,'').replace(/\*\*/g,''))}</span></div>`;
+    if (/^\d+\.\s/.test(line)) {
+      const num = line.match(/^\d+/)[0];
+      return `<div class="result-numbered"><span class="result-num">${num}.</span><span class="result-bullet-text">${escHtml(line.replace(/^\d+\.\s/,'').replace(/\*\*/g,''))}</span></div>`;
+    }
+    return `<p class="result-p">${escHtml(line.replace(/\*\*/g,''))}</p>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── PROGRESS BAR ─────────────────────────────────────────────────────────────
+function updateHeader() {
+  const hr = document.getElementById('headerRight');
+  if (status === 'running') {
+    const pct = (completedSteps.length / STEPS.length * 100).toFixed(0);
+    hr.innerHTML = `<div class="progress-wrap"><div class="progress-bar-track"><div class="progress-bar-fill" style="width:${pct}%"></div></div><span class="progress-label">${completedSteps.length}/${STEPS.length}</span></div>`;
+  } else if (status === 'done') {
+    hr.innerHTML = `<span style="font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:#10B981">✓ Complete</span>`;
+  } else {
+    hr.innerHTML = '';
+  }
+}
+
+// ─── CALL CLAUDE ──────────────────────────────────────────────────────────────
+async function callClaude(prompt, maxTokens = 400) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01', 'x-api-key': apiKey, 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error?.message || `HTTP ${res.status}`);
+  return data.content.map(b => b.text || '').join('');
+}
+
+// ─── DELIVERABLES RESET / UNLOCK ─────────────────────────────────────────────
+function resetDeliverableCards() {
+  // Always re-render both cards fresh so button IDs are guaranteed to exist
+  document.getElementById('deliverablesSection').style.display = 'block';
+  document.getElementById('deliverablesIntro').textContent = 'Run the framework above to unlock prototype and PRD generation.';
+  document.getElementById('protoIcon').style.opacity = '0.3';
+  document.getElementById('prdIcon').style.opacity = '0.3';
+
+  // Remove any previews from previous run
+  ['protoCard','prdCard'].forEach(id => {
+    const card = document.getElementById(id);
+    const preview = card.querySelector('.prototype-preview, .prd-preview');
+    if (preview) preview.remove();
+    card.className = 'deliverable-card';
+  });
+
+  document.getElementById('protoActions').innerHTML = `<button class="btn btn-amber btn-sm" id="protoBtn" onclick="generatePrototype()" disabled style="opacity:0.35;cursor:not-allowed">▶ Generate Prototype</button>`;
+  document.getElementById('prdActions').innerHTML = `<button class="btn btn-purple btn-sm" id="prdBtn" onclick="generatePRD()" disabled style="opacity:0.35;cursor:not-allowed">▶ Generate PRD</button>`;
+}
+
+function unlockDeliverableCards() {
+  document.getElementById('deliverablesIntro').textContent = 'Framework complete. Generate a prototype or PRD from your analysis — click either to start.';
+  document.getElementById('protoIcon').style.opacity = '1';
+  document.getElementById('prdIcon').style.opacity = '1';
+  document.getElementById('protoActions').innerHTML = `<button class="btn btn-amber btn-sm" id="protoBtn" onclick="generatePrototype()">▶ Generate Prototype</button>`;
+  document.getElementById('prdActions').innerHTML = `<button class="btn btn-purple btn-sm" id="prdBtn" onclick="generatePRD()">▶ Generate PRD</button>`;
+}
+
+// ─── RUN FRAMEWORK ────────────────────────────────────────────────────────────
+async function runFramework() {
+  abortFlag = false; status = 'running'; results = {}; completedSteps = []; expandedStep = null; userNotes = []; stepResolve = null;
+  document.getElementById('doneBanner').style.display = 'none';
+  document.getElementById('errorBanner').style.display = 'none';
+  document.getElementById('problemInput').disabled = true;
+  document.getElementById('btnRow').innerHTML = `<button class="btn btn-stop" onclick="stopFramework()">■ Stop</button>`;
+  resetDeliverableCards();
+  renderSteps();
+  updateHeader();
+
+  const problem = document.getElementById('problemInput').value.trim();
+  const accumulated = {};
+
+  for (let i = 0; i < STEPS.length; i++) {
+    if (abortFlag) break;
+    const step = STEPS[i];
+    const isLast = i === STEPS.length - 1;
+    markRunning(step.id, STEP_COLORS[i]);
+    try {
+      // Inject accumulated user notes into the prompt
+      const basePrompt = step.prompt(problem, accumulated);
+      const prompt = basePrompt + getNotesContext();
+      const result = await callClaude(prompt);
+      accumulated[step.id] = result;
+      results[step.id] = result;
+      completedSteps.push(step.id);
+      markCompleted(step.id, STEP_COLORS[i], result);
+      updateHeader();
+      // Pause and wait for user to continue (skip pause on last step)
+      if (!isLast && !abortFlag) {
+        await waitForUserContinue();
+      }
+    } catch (err) {
+      const eb = document.getElementById('errorBanner');
+      eb.style.display = 'block';
+      eb.textContent = `⚠ ${err.message || 'API error — check your key and connection'}`;
+      status = 'error'; resetControls(); return;
+    }
+  }
+
+  status = 'done';
+  updateHeader();
+
+  const done = document.getElementById('doneBanner');
+  done.style.display = 'flex';
+  const notesSummary = userNotes.length > 0 ? ` <span style="font-size:0.6rem;color:var(--amber);margin-left:0.75rem">📝 ${userNotes.length} note${userNotes.length > 1 ? 's' : ''} incorporated</span>` : '';
+  done.innerHTML = `<div><div class="done-label">Framework Complete</div><div class="done-text">All ${STEPS.length} stages generated — click any section to review${notesSummary}</div></div><div class="done-count">${STEPS.length} / ${STEPS.length} ✓</div>`;
+
+  unlockDeliverableCards();
+  resetControls();
+}
+
+function stopFramework() { abortFlag = true; status = 'idle'; if (stepResolve) { stepResolve(); stepResolve = null; } resetControls(); }
+
+function resetControls() {
+  document.getElementById('problemInput').disabled = false;
+  document.getElementById('btnRow').innerHTML = `<button class="btn btn-primary" id="runBtn" onclick="runFramework()">${completedSteps.length > 0 ? '↺ Run Again' : '▶ Run Framework'}</button>`;
+  updateRunBtn();
+}
+
+// ─── GENERATE PROTOTYPE ───────────────────────────────────────────────────────
+async function generatePrototype() {
+  const card = document.getElementById('protoCard');
+  const actions = document.getElementById('protoActions');
+  card.className = 'deliverable-card generating-proto';
+  actions.innerHTML = `<span class="pulse" style="color:#F59E0B;font-size:0.8rem">◉</span><span class="deliverable-status"> Building prototype...</span>`;
+
+  const problem = document.getElementById('problemInput').value.trim();
+  const prompt = `You are a senior product designer and frontend engineer.
+
+Build a complete, self-contained interactive HTML prototype for this product:
+
+PROBLEM: ${problem}
+TOP SOLUTION (from RICE analysis): ${results.prioritisation || ''}
+TARGET USERS: ${results.segments || ''}
+CORE PAIN POINTS: ${results.painpoints || ''}
+
+Requirements:
+- Single HTML file, all CSS and JS inline — zero external dependencies
+- Show 2-3 key screens/states of the core user flow, switchable via a tab bar or nav buttons
+- Use a clean, modern, professional design with a cohesive colour palette
+- Fill with realistic, domain-specific placeholder content (not lorem ipsum)
+- Make it feel like a real product UI, not a wireframe
+- Add subtle hover states and transitions
+- ONLY output raw HTML starting with <!DOCTYPE html> — no explanation, no markdown, no code fences`;
+
+  try {
+    const html = await callClaude(prompt, 4000);
+    const match = html.match(/<!DOCTYPE html>[\s\S]*/i) || html.match(/<html[\s\S]*/i);
+    const cleanHtml = match ? match[0] : html;
+
+    card.className = 'deliverable-card card-done';
+
+    const preview = document.createElement('div');
+    preview.className = 'prototype-preview';
+    preview.innerHTML = `
+      <div class="prototype-preview-bar">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-amber"></div>
+        <div class="dot dot-green"></div>
+        <span style="font-size:0.6rem;color:#475569;margin-left:0.75rem;letter-spacing:0.05em">prototype preview</span>
+      </div>
+      <iframe class="prototype-frame" id="protoFrame"></iframe>`;
+    card.insertBefore(preview, actions);
+
+    const iframe = document.getElementById('protoFrame');
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(cleanHtml);
+    iframe.contentDocument.close();
+
+    actions.innerHTML = `
+      <button class="btn btn-amber btn-sm" onclick="downloadFile('prototype.html', protoHtmlStore)">↓ Download HTML</button>
+      <span class="deliverable-status" style="color:#10B981">✓ Generated</span>`;
+    window.protoHtmlStore = cleanHtml;
+
+  } catch (err) {
+    card.className = 'deliverable-card';
+    actions.innerHTML = `<button class="btn btn-amber btn-sm" onclick="generatePrototype()">↺ Retry</button><span class="deliverable-status" style="color:#EF4444"> ⚠ ${escHtml(err.message)}</span>`;
+  }
+}
+
+// ─── GENERATE PRD ─────────────────────────────────────────────────────────────
+async function generatePRD() {
+  const card = document.getElementById('prdCard');
+  const actions = document.getElementById('prdActions');
+  card.className = 'deliverable-card generating-prd';
+  actions.innerHTML = `<span class="pulse" style="color:#8B5CF6;font-size:0.8rem">◉</span><span class="deliverable-status"> Writing PRD...</span>`;
+
+  const problem = document.getElementById('problemInput').value.trim();
+  const prompt = `You are a senior PM writing a PRD for engineers and stakeholders.
+
+Based on this complete product analysis:
+PROBLEM: ${problem}
+SEGMENTS: ${results.segments || ''}
+PAIN POINTS: ${results.painpoints || ''}
+PROBLEM STATEMENT: ${results.problemstatement || ''}
+HYPOTHESES: ${results.hypothesis || ''}
+SOLUTIONS: ${results.solutions || ''}
+PRIORITISATION: ${results.prioritisation || ''}
+RISKS: ${results.tradeoffs || ''}
+METRICS: ${results.metrics || ''}
+
+Write a structured PRD using EXACTLY this format:
+
+# Product Requirements Document
+
+## Overview
+[2-3 sentence summary of what we're building and why]
+
+## Problem Statement
+[From the analysis above, 2-3 sentences]
+
+## Target Users
+[Top 2 segments, one line each]
+
+## Goals & Success Metrics
+[North star metric + 2 leading + 2 lagging]
+
+## Scope — What We're Building (v1)
+[Top 2 prioritised solutions with brief feature list]
+
+## User Stories
+[5 user stories: As a [user], I want [action] so that [outcome]]
+
+## Functional Requirements
+[8 numbered requirements, specific and testable]
+
+## Out of Scope (v1)
+[3 things explicitly excluded with one-line reason]
+
+## Risks & Mitigations
+[Top 3 risks with one-line mitigation each]
+
+## Open Questions
+[3 questions that need answering before build starts]
+
+Keep it tight, specific, and actionable. No filler.`;
+
+  try {
+    const prd = await callClaude(prompt, 2500);
+    card.className = 'deliverable-card card-done';
+
+    const preview = document.createElement('div');
+    preview.className = 'prd-preview';
+    preview.innerHTML = formatPRD(prd);
+    card.insertBefore(preview, actions);
+
+    window.prdStore = prd;
+    actions.innerHTML = `
+      <button class="btn btn-purple btn-sm" onclick="downloadFile('PRD.md', prdStore)">↓ Download .md</button>
+      <button class="btn btn-outline btn-sm" onclick="copyText(prdStore)">⊕ Copy</button>
+      <span class="deliverable-status" style="color:#10B981">✓ Generated</span>`;
+
+  } catch (err) {
+    card.className = 'deliverable-card';
+    actions.innerHTML = `<button class="btn btn-purple btn-sm" onclick="generatePRD()">↺ Retry</button><span class="deliverable-status" style="color:#EF4444"> ⚠ ${escHtml(err.message)}</span>`;
+  }
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function downloadFile(filename, content) {
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => alert('Copied to clipboard!'));
+}
+</script>
+</body>
+</html>
