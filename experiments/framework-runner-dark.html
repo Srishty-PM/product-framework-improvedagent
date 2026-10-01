@@ -203,7 +203,7 @@
       <button class="btn btn-primary" onclick="saveApiKey()">Unlock</button>
     </div>
     <div class="api-hint">
-      Your key stays in your browser only — never stored or shared. Get a free key (includes $5 credit) at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+      Your API key is held in page memory and sent to Anthropic for generation. Bring your own key; API charges may apply. <a href="https://console.anthropic.com" target="_blank" rel="noopener">Manage your API key</a>
     </div>
   </div>
 
@@ -1034,13 +1034,11 @@ Requirements:
         <div class="dot dot-green"></div>
         <span style="font-size:0.6rem;color:#475569;margin-left:0.75rem;letter-spacing:0.05em">prototype preview</span>
       </div>
-      <iframe class="prototype-frame" id="protoFrame"></iframe>`;
+      <iframe class="prototype-frame" id="protoFrame" title="Generated prototype preview" sandbox="allow-scripts"></iframe>`;
     card.insertBefore(preview, actions);
 
     const iframe = document.getElementById('protoFrame');
-    iframe.contentDocument.open();
-    iframe.contentDocument.write(cleanHtml);
-    iframe.contentDocument.close();
+    iframe.srcdoc = cleanHtml;
 
     actions.innerHTML = `
       <button class="btn btn-amber btn-sm" onclick="downloadFile('prototype.html', protoHtmlStore)">↓ Download HTML</button>
@@ -1147,3 +1145,4 @@ function copyText(text) {
 </script>
 </body>
 </html>
+
