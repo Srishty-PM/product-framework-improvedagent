@@ -6,6 +6,8 @@ The agent turns one problem statement into a connected product analysis. It reco
 
 [Browser tool](https://srishty-pm.github.io/product-framework-improvedagent/) · [Example walkthrough](docs/example-walkthrough.md) · [Portfolio](https://github.com/Srishty-PM/cv) · [Srishty Pahujani](https://srishtypahujani.com/)
 
+![Published Product Intelligence Agent interface](docs/preview.jpg)
+
 ## Why it exists
 
 Product frameworks are useful, but disconnected worksheets make it easy to lose the reasoning between the customer problem, the solution and the success measure. This project explores a coherent workflow with human judgement retained at each stage.
