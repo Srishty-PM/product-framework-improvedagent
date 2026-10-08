@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+vendor/
+# Local/private workspace exports must never be committed.
+*workspace*.json
+PRD*.md
+*prototype.html

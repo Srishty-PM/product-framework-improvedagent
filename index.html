@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; frame-src 'self' about:; font-src 'none'; base-uri 'none'; form-action 'none'" />
   <title>Product Intelligence Agent</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -324,6 +323,31 @@
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
     @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
     .pulse { animation: pulse 1.6s ease-in-out infinite; }
+    .intake h1 {font-family:var(--serif);font-size:1.8rem;font-weight:400;line-height:1.2;margin-bottom:.8rem}
+    .intake h2 {font-size:1rem;margin:1.2rem 0 .5rem}
+    .intake-lead {color:var(--text-muted);margin-bottom:.9rem}
+    .privacy-pill {display:inline-block;color:var(--green);background:var(--green-light);padding:.4rem .65rem;border-radius:5px;font-size:.75rem}
+    .input-tabs {display:flex;gap:.5rem;margin:1.3rem 0 1rem}
+    .input-tabs button {border:1px solid var(--border);background:var(--surface2);padding:.65rem 1rem;border-radius:6px;cursor:pointer;color:var(--text-muted)}
+    .input-tabs button[aria-selected="true"] {background:var(--accent);color:white;border-color:var(--accent)}
+    .intake label:not(.btn) {display:block;margin:.8rem 0 .4rem;font-size:.8rem;color:var(--text-muted)}
+    .intake .api-input {width:100%}
+    .intake select {padding:.5rem;border:1px solid var(--border);border-radius:5px;max-width:100%;background:white;color:var(--text)}
+    .source-role,.engine-row {border-top:1px solid var(--border);margin-top:1rem;padding-top:.25rem}
+    .drop-zone {padding:1.5rem;background:var(--accent-light);border:1px dashed var(--accent);border-radius:8px;cursor:pointer}
+    .drop-zone span {display:block;font-size:.75rem;margin:.4rem 0 .8rem}
+    .source-card {padding:1rem;margin:.75rem 0;background:var(--surface2);border:1px solid var(--border);border-radius:6px}
+    .source-card summary {cursor:pointer;overflow-wrap:anywhere}
+    .source-text {width:100%;margin-top:.7rem;font-family:var(--font);font-size:.8rem;border:1px solid var(--border);padding:.65rem;border-radius:5px}
+    .evidence-field {margin:.75rem 0;padding-left:.75rem;border-left:2px solid var(--accent)}
+    .evidence-field p {white-space:pre-wrap;overflow-wrap:anywhere;font-size:.78rem;color:var(--text-muted)}
+    .evidence-field strong {font-size:.75rem}
+    .workspace-actions {display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem;align-items:center}
+    #intakeMessage {margin-top:.8rem;color:var(--amber);font-size:.8rem}
+    .check-label input {margin-right:.5rem}
+    button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
+    [hidden] {display:none!important}
+    @media(max-width:600px){.main{padding:1.5rem 1rem}.intake{padding:1rem}.intake h1{font-size:1.5rem}.source-role select{width:100%}}
   </style>
 </head>
 <body>
@@ -338,25 +362,49 @@
 
 <main class="main">
 
-  <!-- API KEY -->
-  <div class="api-section" id="apiSection">
-    <div class="section-label">Anthropic API Key</div>
-    <div class="api-row">
-      <input type="password" class="api-input" id="apiKeyInput" placeholder="sk-ant-..." />
-      <button class="btn btn-primary" onclick="saveApiKey()">Unlock</button>
+  <section class="api-section intake" id="intakeSection" aria-labelledby="intakeTitle">
+    <div class="section-label">Start here · Private document workspace</div>
+    <h1 id="intakeTitle">Turn experiment evidence into product decisions.</h1>
+    <p class="intake-lead">Paste notes or choose documents from your computer. Review what was read, then run your ten-step framework.</p>
+    <div class="privacy-pill">● Local processing · No cloud API · Nothing saved automatically</div>
+    <div class="input-tabs" role="tablist" aria-label="Add evidence">
+      <button type="button" role="tab" id="pasteTab" aria-controls="pastePanel" aria-selected="true" onclick="setIntakeTab('paste')">Paste content</button>
+      <button type="button" role="tab" id="uploadTab" aria-controls="uploadPanel" aria-selected="false" onclick="setIntakeTab('upload')">Upload files</button>
     </div>
-    <div class="api-hint">
-      Your API key is held in page memory and sent to Anthropic for generation. Bring your own key; API charges may apply. <a href="https://console.anthropic.com" target="_blank" rel="noopener">Manage your API key</a>
+    <div id="pastePanel" role="tabpanel" aria-labelledby="pasteTab">
+      <label for="sourceName">Document name</label><input id="sourceName" class="api-input" placeholder="e.g. PLP badge test — September" maxlength="150" />
+      <label for="pasteInput">A/B test documentation, research or framework guidance</label>
+      <textarea id="pasteInput" class="feedback-textarea" rows="7" placeholder="Paste the hypothesis, variants, results, guardrails and learnings…"></textarea>
+      <button class="btn btn-primary btn-sm" id="addPasteBtn" onclick="addPastedSource()">Add to workspace</button>
     </div>
-  </div>
+    <div id="uploadPanel" role="tabpanel" aria-labelledby="uploadTab" hidden>
+      <label class="drop-zone" for="documentFiles"><strong>Choose one or more documents</strong><span>PDF, DOCX, XLSX, TXT, Markdown, CSV, JSON or HTML · up to 10 MB each</span>
+      <input id="documentFiles" type="file" multiple accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json,.html,.htm" /></label>
+      <p class="api-hint">Files are read locally. PDF, Word and Excel extraction requires the included local launcher. Scanned PDFs need text/OCR first.</p>
+    </div>
+    <div class="source-role"><label for="sourceRole">Use this document as</label>
+      <select id="sourceRole"><option value="evidence">Past experiment / product evidence</option><option value="guidance">Framework guidance to review and follow</option></select>
+    </div>
+    <p id="intakeMessage" role="status" aria-live="polite"></p>
+    <div id="sourceList"></div>
+    <div id="evidenceReview" hidden><h2>Review the evidence</h2><p>These are excerpts, not validated conclusions. Correct the source text before accepting it. Uploaded instructions are treated as reference material.</p><div id="evidenceCards"></div>
+      <label class="check-label"><input id="acceptEvidence" type="checkbox" /> I have reviewed the extracted text and guidance.</label>
+    </div>
+    <div class="workspace-actions"><button class="btn btn-outline btn-sm" onclick="exportWorkspace()">Save workspace to file</button><label class="btn btn-outline btn-sm" for="importWorkspace">Open saved workspace</label><input type="file" id="importWorkspace" accept=".json" hidden /><button class="btn btn-outline btn-sm" onclick="clearWorkspace()">Clear workspace</button></div>
+    <div class="engine-row"><label for="engineMode">Analysis engine</label><select id="engineMode"><option value="evidence">Offline evidence workbook — no model required</option><option value="ollama">Local AI — Ollama on this computer</option></select>
+      <label for="localModel">Installed model name</label><input id="localModel" class="api-input" value="" placeholder="e.g. your installed Ollama model" disabled />
+      <p id="engineHelp" class="api-hint">Extracts relevant evidence and builds an editable framework workbook. Does not infer missing facts or train a model. Local AI enables document reasoning when a model is already installed.</p>
+      <label class="check-label"><input id="autoRun" type="checkbox" checked /> Run all ten steps automatically (uncheck to review each step)</label>
+    </div>
+  </section>
 
   <!-- PROBLEM STATEMENT -->
   <div class="problem-section">
-    <div class="section-label">Problem Statement</div>
+    <label class="section-label" for="problemInput">Product problem / decision to explore</label>
     <textarea id="problemInput" class="problem-textarea" rows="3" placeholder="Enter the problem statement..."></textarea>
     <div class="btn-row" id="btnRow">
       <button class="btn btn-primary" id="runBtn" onclick="runFramework()" disabled>▶ Run Framework</button>
-      <a class="btn btn-outline" href="https://github.com/Srishty-PM/product-framework-improvedagent/blob/main/docs/example-walkthrough.md" target="_blank" rel="noopener" style="text-decoration:none">Read example · no API key</a>
+
     </div>
   </div>
 
@@ -402,7 +450,7 @@
 
   <!-- FOOTER -->
   <div class="footer">
-    <span>Powered by Claude — Anthropic</span>
+    <span>Private offline edition · Evidence stays on this device</span>
     <span>Segments → Pain Points → Problem → Hypothesis → Solutions → ML → Data → RICE → Risks → Metrics → Deliverables</span>
   </div>
 
@@ -410,7 +458,9 @@
 
 <script>
 // ─── STATE ────────────────────────────────────────────────────────────────────
-let apiKey = '';
+let activeRequest = null;
+let runGeneration = 0;
+let runSnapshot = null;
 let abortFlag = false;
 let status = 'idle';
 let results = {};
@@ -687,7 +737,7 @@ Be concrete (e.g. "ratio of 5-star to 1-star reviews in last 12 months"). Max 10
     id: 'prioritisation', label: '08 — RICE Prioritisation', icon: '◉',
     prompt: (p, prev) => `You are a senior PM in a product interview. Solutions: ${prev.solutions}
 
-Output a RICE scoring table with ALL rows filled. RICE Score = (Reach × Impact × Confidence) / Effort:
+Output a RICE scoring table with unknown inputs marked TBD. RICE Score = (Reach × Impact × Confidence) / Effort. Only calculate with documented comparable reach, impact, confidence (0–1), and effort in consistent units. Leave unknown inputs TBD; never invent scores:
 
 | Solution | Reach (1-10) | Impact (1-10) | Confidence (1-10) | Effort (1-10) | RICE Score |
 |---|---|---|---|---|---|
@@ -792,25 +842,17 @@ Max 180 words.`;
   }
 ];
 
-// ─── API KEY ──────────────────────────────────────────────────────────────────
-function saveApiKey() {
-  const val = document.getElementById('apiKeyInput').value.trim();
-  if (!val.startsWith('sk-')) { alert('Please enter a valid Anthropic API key (starts with sk-)'); return; }
-  apiKey = val;
-  const section = document.getElementById('apiSection');
-  section.classList.add('unlocked');
-  section.innerHTML = `<div class="section-label">API Key</div><div class="unlocked-badge">✓ Unlocked — ready to run</div>`;
-  updateRunBtn();
-}
-
 function updateRunBtn() {
   const btn = document.getElementById('runBtn');
   if (!btn) return;
-  const problem = document.getElementById('problemInput').value.trim();
-  btn.disabled = !apiKey || !problem || status === 'running';
+  const accepted = !sources.length || document.getElementById('acceptEvidence').checked;
+  const engineOK = document.getElementById('engineMode').value === 'evidence' ||
+    (location.protocol !== 'file:' && document.getElementById('localModel').value.trim());
+  btn.disabled = !document.getElementById('problemInput').value.trim() || !accepted || !engineOK || status === 'running' || intakeBusy || deliverableBusy;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initOffline();
   document.getElementById('problemInput').addEventListener('input', updateRunBtn);
   renderSteps();
 });
@@ -869,6 +911,7 @@ function markCompleted(stepId, color, text) {
   }
   header.onclick = () => toggleStep(stepId);
   expandStep(stepId);
+  addDraftEditor(stepId);
   // Add feedback bar
   const content = document.getElementById(`content-${stepId}`);
   const bar = document.createElement('div');
@@ -1003,20 +1046,7 @@ function formatResult(text) {
 }
 
 // markdown-aware formatter for PRD
-function formatPRD(text) {
-  return text.split('\n').map(line => {
-    if (!line.trim()) return '<div style="height:0.4rem"></div>';
-    if (line.startsWith('# ')) return `<div style="color:var(--text);font-size:0.9rem;font-family:var(--serif);font-style:italic;margin:0.5rem 0 0.75rem">${escHtml(line.replace(/^#\s/,''))}</div>`;
-    if (line.startsWith('## ')) return `<div style="color:#8B5CF6;font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;margin:1rem 0 0.4rem;font-weight:600;border-top:1px solid #1e293b;padding-top:0.75rem">${escHtml(line.replace(/^##\s/,''))}</div>`;
-    if (line.startsWith('- ') || line.startsWith('• '))
-      return `<div class="result-bullet"><span class="result-bullet-dash">—</span><span class="result-bullet-text">${escHtml(line.replace(/^[-•]\s/,'').replace(/\*\*/g,''))}</span></div>`;
-    if (/^\d+\.\s/.test(line)) {
-      const num = line.match(/^\d+/)[0];
-      return `<div class="result-numbered"><span class="result-num">${num}.</span><span class="result-bullet-text">${escHtml(line.replace(/^\d+\.\s/,'').replace(/\*\*/g,''))}</span></div>`;
-    }
-    return `<p class="result-p">${escHtml(line.replace(/\*\*/g,''))}</p>`;
-  }).join('');
-}
+function formatPRD(text) { return formatResult(text); }
 
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1035,16 +1065,18 @@ function updateHeader() {
   }
 }
 
-// ─── CALL CLAUDE ──────────────────────────────────────────────────────────────
-async function callClaude(prompt, maxTokens = 400) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01', 'x-api-key': apiKey, 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
+// Local analysis: no remote providers or API keys.
+async function callLocal(prompt, maxTokens = 1800) {
+  if (!runSnapshot || runSnapshot.engine !== 'ollama') throw new Error('Local AI is not selected.');
+  activeRequest = new AbortController();
+  const response = await fetch('/api/analyse', {
+    method: 'POST', headers: {'Content-Type':'application/json', 'X-PIA-Request':'local'},
+    body: JSON.stringify({model:runSnapshot.model, prompt, max_tokens:maxTokens}),
+    signal: activeRequest.signal
   });
-  const data = await res.json();
-  if (!res.ok || data.error) throw new Error(data.error?.message || `HTTP ${res.status}`);
-  return data.content.map(b => b.text || '').join('');
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Local model failed.');
+  return data.text;
 }
 
 // ─── DELIVERABLES RESET / UNLOCK ─────────────────────────────────────────────
@@ -1068,7 +1100,7 @@ function resetDeliverableCards() {
 }
 
 function unlockDeliverableCards() {
-  document.getElementById('deliverablesIntro').textContent = 'Framework complete. Generate a prototype or PRD from your analysis — click either to start.';
+  document.getElementById('deliverablesIntro').textContent = 'Framework complete. Export a draft PRD or create a prototype. Review evidence, assumptions and missing data before sharing.';
   document.getElementById('protoIcon').style.opacity = '1';
   document.getElementById('prdIcon').style.opacity = '1';
   document.getElementById('protoActions').innerHTML = `<button class="btn btn-amber btn-sm" id="protoBtn" onclick="generatePrototype()">▶ Generate Prototype</button>`;
@@ -1077,6 +1109,12 @@ function unlockDeliverableCards() {
 
 // ─── RUN FRAMEWORK ────────────────────────────────────────────────────────────
 async function runFramework() {
+  if (status === 'running' || intakeBusy || deliverableBusy) return;
+  updateRunBtn();
+  if (document.getElementById('runBtn')?.disabled) return;
+  const generation = ++runGeneration;
+  runSnapshot = captureWorkspace();
+  setIntakeLocked(true);
   abortFlag = false; status = 'running'; results = {}; completedSteps = []; expandedStep = null; userNotes = []; stepResolve = null;
   document.getElementById('doneBanner').style.display = 'none';
   document.getElementById('errorBanner').style.display = 'none';
@@ -1087,7 +1125,15 @@ async function runFramework() {
   updateHeader();
 
   const problem = document.getElementById('problemInput').value.trim();
-  const accumulated = {};
+  const accumulated = results;
+  if (runSnapshot.engine === 'ollama') {
+    try { await learnDocuments(generation); } catch (err) {
+      if (generation !== runGeneration) return;
+      const eb = document.getElementById('errorBanner'); eb.style.display = 'block'; eb.textContent = err.message;
+      status = 'error'; updateHeader(); resetControls(); return;
+    }
+    if (generation !== runGeneration || abortFlag) return;
+  }
 
   for (let i = 0; i < STEPS.length; i++) {
     if (abortFlag) break;
@@ -1096,9 +1142,8 @@ async function runFramework() {
     markRunning(step.id, STEP_COLORS[i]);
     try {
       // Inject accumulated user notes into the prompt
-      const basePrompt = step.prompt(problem, accumulated);
-      const prompt = basePrompt + getNotesContext();
-      const result = await callClaude(prompt);
+      const result = runSnapshot.engine === 'evidence' ? buildEvidenceStep(step, problem) : validateReferences(await callLocal(buildGroundedPrompt(step, problem, accumulated)));
+      if (generation !== runGeneration) return;
       if (abortFlag) break;
       accumulated[step.id] = result;
       results[step.id] = result;
@@ -1106,14 +1151,16 @@ async function runFramework() {
       markCompleted(step.id, STEP_COLORS[i], result);
       updateHeader();
       // Pause and wait for user to continue (skip pause on last step)
-      if (!isLast && !abortFlag) {
+      if (!isLast && !abortFlag && !runSnapshot.autoRun) {
         await waitForUserContinue();
       }
     } catch (err) {
+      if (generation !== runGeneration) return;
       const eb = document.getElementById('errorBanner');
       eb.style.display = 'block';
-      eb.textContent = `⚠ ${err.message || 'API error — check your key and connection'}`;
-      status = 'error'; resetControls(); return;
+      eb.textContent = `⚠ ${err.message || 'Local analysis error — check the local model or use the evidence workbook'}`;
+      if (generation !== runGeneration) return;
+      status = 'error'; updateHeader(); resetControls(); return;
     }
   }
 
@@ -1124,20 +1171,22 @@ async function runFramework() {
     return;
   }
   status = 'done';
+  message(runSnapshot.engine === 'evidence' ? 'Evidence workbook ready. Review and edit the stage drafts, then export deliverables.' : 'Local AI framework complete. Review source references and draft decisions before using the outputs.');
   updateHeader();
 
   const done = document.getElementById('doneBanner');
   done.style.display = 'flex';
   const notesSummary = userNotes.length > 0 ? ` <span style="font-size:0.6rem;color:var(--amber);margin-left:0.75rem">📝 ${userNotes.length} note${userNotes.length > 1 ? 's' : ''} incorporated</span>` : '';
-  done.innerHTML = `<div><div class="done-label">Framework Complete</div><div class="done-text">All ${STEPS.length} stages generated — click any section to review${notesSummary}</div></div><div class="done-count">${STEPS.length} / ${STEPS.length} ✓</div>`;
+  done.innerHTML = `<div><div class="done-label">${runSnapshot.engine === 'evidence' ? 'Evidence workbook ready' : 'Framework Complete — review AI drafts'}</div><div class="done-text">All ${STEPS.length} stages generated — click any section to review${notesSummary}</div></div><div class="done-count">${STEPS.length} / ${STEPS.length} ✓</div>`;
 
   unlockDeliverableCards();
   resetControls();
 }
 
-function stopFramework() { abortFlag = true; status = 'idle'; if (stepResolve) { stepResolve(); stepResolve = null; } resetControls(); }
+function stopFramework() { abortFlag = true; ++runGeneration; activeRequest?.abort(); status = 'idle'; if (stepResolve) { stepResolve(); stepResolve = null; } setIntakeLocked(false); updateHeader(); resetControls(); }
 
 function resetControls() {
+  setIntakeLocked(false);
   document.getElementById('problemInput').disabled = false;
   document.getElementById('btnRow').innerHTML = `<button class="btn btn-primary" id="runBtn" onclick="runFramework()">${completedSteps.length > 0 ? '↺ Run Again' : '▶ Run Framework'}</button>`;
   updateRunBtn();
@@ -1145,6 +1194,9 @@ function resetControls() {
 
 // ─── GENERATE PROTOTYPE ───────────────────────────────────────────────────────
 async function generatePrototype() {
+  if (status !== 'done' || deliverableBusy) return;
+  if (runSnapshot.engine === 'evidence') return createWorkbookPrototype();
+  beginDeliverable();
   const card = document.getElementById('protoCard');
   const actions = document.getElementById('protoActions');
   card.className = 'deliverable-card generating-proto';
@@ -1161,7 +1213,7 @@ TARGET USERS: ${results.segments || ''}
 CORE PAIN POINTS: ${results.painpoints || ''}
 
 Requirements:
-- Single HTML file, all CSS and JS inline — zero external dependencies
+- Single HTML file, all CSS and JS inline — zero external dependencies; no fetch, external URLs or network requests
 - Show 2-3 key screens/states of the core user flow, switchable via a tab bar or nav buttons
 - Use a clean, modern, professional design with a cohesive colour palette
 - Fill with realistic, domain-specific placeholder content (not lorem ipsum)
@@ -1170,12 +1222,14 @@ Requirements:
 - ONLY output raw HTML starting with <!DOCTYPE html> — no explanation, no markdown, no code fences`;
 
   try {
-    const html = await callClaude(prompt, 4000);
+    const html = await callLocal(prompt + deliverableEvidence(), 6000);
     const match = html.match(/<!DOCTYPE html>[\s\S]*/i) || html.match(/<html[\s\S]*/i);
-    const cleanHtml = match ? match[0] : html;
+    const rawHtml = match ? match[0] : html;
+    const cleanHtml = protectPrototype(rawHtml);
 
     card.className = 'deliverable-card card-done';
 
+    card.querySelector('.prototype-preview')?.remove();
     const preview = document.createElement('div');
     preview.className = 'prototype-preview';
     preview.innerHTML = `
@@ -1199,11 +1253,14 @@ Requirements:
   } catch (err) {
     card.className = 'deliverable-card';
     actions.innerHTML = `<button class="btn btn-amber btn-sm" onclick="generatePrototype()">↺ Retry</button><span class="deliverable-status" style="color:#EF4444"> ⚠ ${escHtml(err.message)}</span>`;
-  }
+  } finally { endDeliverable(); }
 }
 
 // ─── GENERATE PRD ─────────────────────────────────────────────────────────────
 async function generatePRD() {
+  if (status !== 'done' || deliverableBusy) return;
+  if (runSnapshot.engine === 'evidence') return createWorkbookPRD();
+  beginDeliverable();
   const card = document.getElementById('prdCard');
   const actions = document.getElementById('prdActions');
   card.className = 'deliverable-card generating-prd';
@@ -1260,9 +1317,10 @@ Write a structured PRD using EXACTLY this format:
 Keep it tight, specific, and actionable. No filler.`;
 
   try {
-    const prd = await callClaude(prompt, 2500);
+    const prd = validateReferences(await callLocal(prompt + deliverableEvidence(), 5000));
     card.className = 'deliverable-card card-done';
 
+    card.querySelector('.prd-preview')?.remove();
     const preview = document.createElement('div');
     preview.className = 'prd-preview';
     preview.innerHTML = formatPRD(prd);
@@ -1277,7 +1335,7 @@ Keep it tight, specific, and actionable. No filler.`;
   } catch (err) {
     card.className = 'deliverable-card';
     actions.innerHTML = `<button class="btn btn-purple btn-sm" onclick="generatePRD()">↺ Retry</button><span class="deliverable-status" style="color:#EF4444"> ⚠ ${escHtml(err.message)}</span>`;
-  }
+  } finally { endDeliverable(); }
 }
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
@@ -1291,9 +1349,11 @@ function downloadFile(filename, content) {
 }
 
 function copyText(text) {
-  navigator.clipboard.writeText(text).then(() => alert('Copied to clipboard!'));
+  navigator.clipboard.writeText(text).then(() => alert('Copied to clipboard!')).catch(() => alert('Clipboard unavailable. Use Download instead.'));
 }
 </script>
+<script src="offline.js"></script>
 </body>
 </html>
+
 

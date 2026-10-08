@@ -1,0 +1,2 @@
+# Only needed for a source checkout. The downloadable offline kit bundles this parser.
+pypdf==6.10.0
