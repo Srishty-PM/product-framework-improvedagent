@@ -94,7 +94,7 @@ async function readPdfBytes(bytes) {
   const pdfjs = await pdfLibraryPromise;
   pdfjs.GlobalWorkerOptions.workerSrc = PARSER_CDN + 'pdfjs-dist@6.4.299/build/pdf.worker.mjs';
   const task = pdfjs.getDocument({data: bytes, isEvalSupported: false, enableXfa: false, disableFontFace: true});
-  task.onPassword = () => task.destroy();
+  task.onPassword = updatePassword => updatePassword(new Error('Encrypted PDFs are unsupported. Export a readable text version.'));
   try {
     const pdf = await task.promise;
     if (pdf.numPages > 100) throw new Error('PDF exceeds 100 pages. Split it into relevant experiments.');
@@ -109,5 +109,8 @@ async function readPdfBytes(bytes) {
     }
     if (!text.trim()) throw new Error('No readable PDF text. Supply an OCR/text version for scanned pages.');
     return text;
+  } catch (error) {
+    if (error.name === 'PasswordException') throw new Error('Encrypted PDFs are unsupported. Export a readable text version.');
+    throw error;
   } finally { await task.destroy(); }
 }
