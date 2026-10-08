@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": { "test": "node online-smoke.cjs" },
+  "devDependencies": {
+    "playwright": "1.62.1",
+    "pdfjs-dist": "6.4.299",
+    "jszip": "3.10.2"
+  }
+}
