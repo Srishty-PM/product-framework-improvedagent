@@ -881,6 +881,7 @@ function updateRunBtn() {
     document.getElementById('engineMode').value === 'evidence' ? 'Ready to build an editable evidence workbook. This mode does not perform AI analysis.' : 'Ready to run the ten-step AI framework.';
   if(btn)btn.disabled ||= draftEditorOpen;
   document.querySelectorAll('.feedback-bar button').forEach(x=>x.disabled=draftEditorOpen);
+  document.querySelectorAll('#deliverablesSection button').forEach(x=>x.disabled=draftEditorOpen||deliverableBusy||status!=='done');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
