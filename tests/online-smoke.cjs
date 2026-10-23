@@ -50,6 +50,8 @@ async function archive(entries) {
   page.on('pageerror', e => failures.push(e.message));
   page.on('dialog', d => d.accept());
   await page.goto('http://127.0.0.1:8766');
+  await page.locator('#evidenceIntake > summary').click();
+  await page.locator('#runSpeed').selectOption('detailed');
   await page.locator('#problemInput').fill('Improve checkout conversion while protecting customer complaints.');
   const evidence = 'Hypothesis: clearer labels improve conversion.\n' + 'Audience: eligible web shoppers. '.repeat(950) + '\nLearning: FINAL_DOCUMENT_LINE. CI and sample size missing.\n<img src="https://example.com/leak" onerror="alert(1)">';
   await page.locator('#sourceName').fill('Checkout A/B test');
@@ -119,7 +121,7 @@ async function archive(entries) {
   assert.equal(prompts.length, beforeWorkbook);
   // Real ZIP/XML and PDF.js parsers, served from their pinned npm distributions.
   const upload = await context.newPage(); upload.on('pageerror', e => failures.push(e.message));
-  await upload.goto('http://127.0.0.1:8766'); await upload.locator('#uploadTab').click();
+  await upload.goto('http://127.0.0.1:8766'); await upload.locator('#evidenceIntake > summary').click(); await upload.locator('#uploadTab').click();
   const docx = await archive({'word/document.xml':'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hypothesis: clearer checkout labels.</w:t></w:r></w:p></w:body></w:document>'});
   const xlsx = await archive({
     'xl/workbook.xml':'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Results" r:id="r1"/></sheets></workbook>',

@@ -6,13 +6,13 @@
 
 ## Your workflow
 
-1. Start with **Paste content** or **Upload files**. Add A/B test write-ups, research, results or product notes.
+1. Start with the **product problem or decision** you want to explore. Optionally open **Add evidence or framework guidance**, then paste or upload A/B test write-ups, research, results or product notes.
 2. Mark each document as **Past experiment / product evidence** or **Framework guidance to review and follow**. Guidance can specify the content and format you require at each of the existing ten stages.
 3. Expand the documents to inspect and correct their full extracted text. Review the experiment-field excerpts and accept the evidence.
-4. Enter the product problem or decision you want to explore.
+4. You can also run without documents. Claude labels proposed assumptions separately from documented facts; the no-key workbook leaves evidence gaps for you to complete.
 5. Choose **Claude AI**, enter your own Anthropic API key, and authorise sending the brief, documents, guidance and generated drafts to Anthropic. API usage incurs charges. The default model is `claude-sonnet-4-6`; you can enter another supported model ID available to your account.
-6. Run all ten stages automatically, or uncheck that option to review each stage and add notes before continuing.
-7. Review the **What the agent learned from your documents** register and the stage drafts. Edit drafts, then generate a Markdown PRD or interactive HTML prototype.
+6. **Fast** is the default automatic mode: one streamed analysis request generates all ten connected stages, with concise drafts displayed as they arrive. **Detailed** uses a separate request per stage. Uncheck automatic running to review each stage and add notes before continuing. Document-reading and deliverable requests are separate in every mode.
+7. Review the **What the agent learned from your documents** register and the stage drafts. Editing an earlier stage clears later drafts; **Resume Framework** regenerates them from the updated decision before deliverables unlock. Interrupted or failed runs also keep completed stages. Unchanged evidence documents are analysed once per page and model, then reused for new decision briefs. Clearing the workspace clears that memory too.
 8. **Save workspace to file** exports documents and the brief as plain JSON. **Open saved workspace** restores them for a fresh review and analysis. Download generated deliverables separately.
 
 The agent reads every evidence document in bounded chunks, extracts referenced experiment learnings, and carries those learnings, relevant excerpts, framework guidance, previous stage drafts and PM feedback into subsequent steps. Documents provide context for the current run; this does not train a model or permanently change its knowledge. Saved workspaces let you reuse documents in later sessions.
@@ -76,8 +76,11 @@ The app uses vanilla HTML/CSS/JavaScript. `index.html` holds the original prompt
 ```sh
 npm install --prefix tests
 npx --prefix tests playwright install chromium
-node tests/online-smoke.cjs
+npm test --prefix tests
+npm run test:browser --prefix tests
 ```
+
+The DOM regression suite verifies one-request streaming, stage order, split Unicode/CRLF events, incomplete streams, invalid citations, guided pauses, cancellation, resume, downstream invalidation after edits and document-analysis reuse. Claude responses are simulated; live latency and model quality are unverified.
 
 The browser test serves the actual pinned PDF.js/JSZip distributions locally and simulates Claude responses. It checks real PDF/DOCX/XLSX/CSV extraction, consent gating, reading the end of long documents, all ten stages, guidance propagation, source-reference rejection, incomplete responses, cancellation/restart, guided workbook mode, PRD/prototype isolation, key-free workspace save/reopen and mobile overflow. No paid inference was performed; actual model quality and account access require your own API key.
 
