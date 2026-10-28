@@ -40,6 +40,7 @@ Marketplace prompts account for supply, demand and matching. B2B prompts disting
 - Uncheck **Continue automatically to prototype, then PRD** to review the completed analysis before creating deliverables manually.
 - **Stop** preserves finished stages and deliverables. Resume analysis or choose **Resume deliverables** to generate only the missing outputs.
 - Changing the problem statement clears old outputs. Editing an earlier stage invalidates downstream analysis and deliverables; resume to regenerate them from the edited decision. Regenerating the prototype invalidates the old PRD.
+- Prototype generation streams progress with a 12,000-token output ceiling and a compact design target. A clipped or incomplete HTML response triggers one automatic retry with a smaller two-screen design; partial HTML is never executed. The prototype request has a five-minute timeout and can be stopped. No automatic retry is made for authentication/rate-limit errors.
 - Provider errors and truncated/interrupted responses are surfaced. Completed stages are retained; incomplete outputs do not count as finished. A failed prototype stops the sequence before PRD generation. A failed PRD preserves the prototype for retry.
 
 ## Boundaries
