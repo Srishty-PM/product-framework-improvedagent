@@ -1,83 +1,91 @@
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-const {JSDOM} = require(process.env.JSDOM_TEST_PATH || 'jsdom');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const {JSDOM}=require(process.env.JSDOM_TEST_PATH||'jsdom');
 const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const runner=fs.readFileSync(path.join(root,'framework-runner.js'),'utf8');
 const inline=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
-const workspace=fs.readFileSync(path.join(root,'document-workspace.js'),'utf8');
 const tick=()=>new Promise(r=>setImmediate(r));
+const proto='<!DOCTYPE html><html><body><h1>Discovery prototype</h1><button>Explore products</button></body></html>';
 async function app(){
- const dom=new JSDOM(html,{url:'https://example.test/',runScripts:'outside-only',pretendToBeVisual:true});
- const w=dom.window, ctx=dom.getInternalVMContext();
+ const dom=new JSDOM(html,{url:'https://example.test',runScripts:'outside-only',pretendToBeVisual:true});
+ const w=dom.window,ctx=dom.getInternalVMContext();
  w.TextDecoder=TextDecoder;w.AbortController=AbortController;w.confirm=()=>true;
- vm.runInContext(inline,ctx);vm.runInContext(workspace,ctx);
- await tick();
- return {w,d:w.document,run:s=>vm.runInContext(s,ctx),close:()=>dom.window.close()};
+ vm.runInContext(inline,ctx);vm.runInContext(runner,ctx);await tick();
+ const a={w,d:w.document,run:s=>vm.runInContext(s,ctx),close:()=>dom.window.close(),requests:[],failure:null};
+ a.w.fetch=async(url,opts)=>{
+  const body=JSON.parse(opts.body),prompt=body.messages[0].content;
+  const kind=prompt.includes('ONLY output raw HTML')?'prototype':prompt.startsWith('You are a senior PM writing a PRD')?'prd':'analysis';
+  a.requests.push({kind,body});
+  assert.equal(url,'https://api.anthropic.com/v1/messages');
+  if(a.failure?.kind===kind){const f=a.failure;a.failure=null;if(f.abort)return await new Promise((resolve,reject)=>opts.signal.addEventListener('abort',()=>reject(new w.DOMException('Aborted','AbortError'))));return new Response(JSON.stringify({error:{message:f.message||'Fixture provider error'}}),{status:f.status||429,headers:{'content-type':'application/json'}});}
+  if(body.stream){
+   const ids=prompt.match(/Use exactly these IDs in this order: ([\w, ]+)\./)[1].split(', ');
+   return sse(ids);
+  }
+  const text=kind==='prototype'?proto:kind==='prd'?'# Product Requirements Document\n## Overview\nDiscovery prototype and Explore products flow.\n## Functional Requirements\nGiven an eligible shopper, when they choose Explore products, then show matching products.\n## Open Questions\nTargets and RICE inputs remain TBD.':'## Draft\nCandidate approach based on the problem statement. Assumptions and metrics TBD.';
+  return new Response(JSON.stringify({content:[{type:'text',text}],stop_reason:'end_turn'}),{headers:{'content-type':'application/json'}});
+ };
+ input(a,'problemInput','Improve product discovery for mobile marketplace shoppers.');input(a,'apiKeyInput','sk-ant-fixture-only-not-real');a.d.getElementById('cloudConsent').checked=true;a.run('updateRunBtn()');
+ return a;
 }
-function input(a,id,value){a.d.getElementById(id).value=value;a.d.getElementById(id).dispatchEvent(new a.w.Event('input',{bubbles:true}));}
-function change(a,id,value){a.d.getElementById(id).value=value;a.d.getElementById(id).dispatchEvent(new a.w.Event('change',{bubbles:true}));}
-function prepare(a,engine='evidence'){
- input(a,'problemInput','Improve product discovery for mobile marketplace shoppers.');
- change(a,'engineMode',engine);
- if(engine==='cloud'){input(a,'apiKeyInput','sk-ant-fixture-not-real');a.d.getElementById('cloudConsent').checked=true;a.run('updateRunBtn()');}
-}
-function sse(events){
- const wire=events.map(e=>`event: ${e.type}\r\ndata: ${JSON.stringify(e)}\r\n\r\n`).join('');
- const bytes=new TextEncoder().encode(wire);let offset=0;
- return new Response(new ReadableStream({pull(controller){if(offset>=bytes.length){controller.close();return;}const next=Math.min(bytes.length,offset+7);controller.enqueue(bytes.slice(offset,next));offset=next;}}),{headers:{'content-type':'text/event-stream'}});
-}
-function stageEvents(ids,reason='end_turn'){
- const events=[{type:'message_start',message:{}}];
- for(const id of ids){const text=`<<<STAGE:${id}>>>\n## Draft ${id}\nProposed approach; evidence is TBD. Café.\n<<<END:${id}>>>\n`;for(let n=0;n<text.length;n+=13)events.push({type:'content_block_delta',delta:{type:'text_delta',text:text.slice(n,n+13)}});}
- events.push({type:'message_delta',delta:{stop_reason:reason}},{type:'message_stop'});return events;
+function input(a,id,value){const el=a.d.getElementById(id);el.value=value;el.dispatchEvent(new a.w.Event('input',{bubbles:true}));}
+function sse(ids,reason='end_turn'){
+ const events=[];
+ for(const id of ids){const text=`<<<STAGE:${id}>>>\n## ${id}\nProposed discovery approach; assumptions and RICE inputs TBD. Café.\n<<<END:${id}>>>\n`;events.push({type:'content_block_delta',delta:{type:'text_delta',text}});}
+ events.push({type:'message_delta',delta:{stop_reason:reason}},{type:'message_stop'});
+ const bytes=new TextEncoder().encode(events.map(e=>`event: ${e.type}\r\ndata: ${JSON.stringify(e)}\r\n\r\n`).join(''));let offset=0;
+ return new Response(new ReadableStream({pull(c){if(offset>=bytes.length){c.close();return;}const end=Math.min(bytes.length,offset+11);c.enqueue(bytes.slice(offset,end));offset=end;}}),{headers:{'content-type':'text/event-stream'}});
 }
 (async()=>{
- let a=await app();prepare(a);
- assert.equal(a.d.getElementById('runBtn').disabled,false);
- await a.run('runFramework()');assert.equal(a.run('completedSteps.length'),10);
- assert.equal(a.d.querySelectorAll('.feedback-bar').length,0,'automatic runs must not show Continue controls');
- assert.equal(a.d.querySelector('#header-segments').getAttribute('aria-expanded'),'true');
- a.run('generatePRD();generatePrototype()');
- assert.match(a.w.prdStore,/Improve product discovery/);assert.match(a.w.protoHtmlStore,/sandbox="allow-scripts"/);
- a.d.querySelector('#content-segments button').click();input(a,'problemInput',a.d.getElementById('problemInput').value); // explicitly changing brief invalidates drafts
- await a.run('runFramework()');
- a.d.querySelector('#content-segments button').click();
- const editor=a.d.querySelector('#content-segments textarea');editor.value='Changed audience: returning mobile shoppers only.';
- a.d.querySelectorAll('#content-segments button')[1].click();
- assert.equal(a.run('completedSteps.length'),1);assert.equal(a.run('status'),'idle');assert.equal(a.d.getElementById('prdBtn').disabled,true);
- await a.run('runFramework(true)');assert.equal(a.run('completedSteps.length'),10);assert.match(a.run('results.segments'),/returning mobile/);
- a.run('invalidateRun()');a.d.getElementById('autoRun').checked=false;
- const guided=a.run('runFramework()');await tick();assert.equal(a.run('pausedStep'),'segments');
- a.run("continueStep('metrics',false)");await tick();assert.equal(a.run('pausedStep'),'segments','old steps must not advance current pause');
- a.run("continueStep('segments',false)");await tick();assert.equal(a.run('pausedStep'),'painpoints');
- a.run('stopFramework()');await guided;assert.equal(a.run('completedSteps.length'),2);assert.equal(a.run('status'),'idle');
- a.d.getElementById('autoRun').checked=true;await a.run('runFramework(true)');assert.equal(a.run('status'),'done');a.close();
- a=await app();prepare(a,'cloud');const requests=[];
- const ids=Array.from(a.run('STEPS.map(s=>s.id)'));
- a.w.fetch=async(url,options)=>{const body=JSON.parse(options.body);requests.push(body);assert.equal(url,'https://api.anthropic.com/v1/messages');return sse(stageEvents(ids));};
- await a.run('runFramework()');assert.equal(a.run('status'),'done');assert.equal(requests.length,1,'Fast run should use one request for all ten stages');assert.equal(requests[0].stream,true);assert.equal(a.run('completedSteps.length'),10);assert.match(a.run('results.metrics'),/Café/);
- a.run('invalidateRun()');let attempt=0;
- a.w.fetch=async()=>{attempt++;return sse(stageEvents(attempt===1?ids.slice(0,3):ids.slice(3),attempt===1?'max_tokens':'end_turn'));};
- await a.run('runFramework()');assert.equal(a.run('status'),'error');assert.equal(a.run('completedSteps.length'),3);assert.equal(a.d.getElementById('prdBtn').disabled,true);
- await a.run('runFramework(true)');assert.equal(a.run('status'),'done');assert.equal(a.run('completedSteps.length'),10);
- a.run('invalidateRun()');
- a.w.fetch=async()=>sse([{type:'content_block_delta',delta:{type:'text_delta',text:'<<<STAGE:segments>>>Unsupported claim [D99:L1]<<<END:segments>>>'}},{type:'message_delta',delta:{stop_reason:'end_turn'}},{type:'message_stop'}]);
- await a.run('runFramework()');assert.equal(a.run('status'),'error');assert.equal(a.run('completedSteps.length'),0);assert.match(a.d.getElementById('errorBanner').textContent,/nonexistent source/);
- a.run('invalidateRun()');
- a.w.fetch=async()=>sse([{type:'content_block_delta',delta:{type:'text_delta',text:'<<<STAGE:segments>>>Partial content'}}]);
- await a.run('runFramework()');assert.equal(a.run('status'),'error');assert.equal(a.run('completedSteps.length'),0);
- // A stopped guided run cannot resume its old loop after a new run has started.
- a.run('invalidateRun()');change(a,'engineMode','evidence');a.d.getElementById('autoRun').checked=false;
- const old=a.run('runFramework()');await tick();a.run('stopFramework()');a.d.getElementById('autoRun').checked=true;await a.run('runFramework(true)');await old;assert.equal(a.run('status'),'done');assert.equal(a.run('completedSteps.length'),10);
- a.close();
- a=await app();prepare(a,'cloud');change(a,'runSpeed','detailed');
- input(a,'sourceName','Test evidence');input(a,'pasteInput','Hypothesis: clearer labels improve conversion.\nAudience: mobile shoppers.');a.run('addPastedSource()');a.d.getElementById('acceptEvidence').checked=true;a.d.getElementById('cloudConsent').checked=true;a.run('updateRunBtn()');
- let calls=0,readings=0;
- a.w.fetch=async(url,opt)=>{calls++;if(JSON.parse(opt.body).messages[0].content.includes('FULL-TEXT EXCERPT'))readings++;return new Response(JSON.stringify({content:[{type:'text',text:'Documented hypothesis [D1:L1]. Unknown values are TBD.'}],stop_reason:'end_turn'}),{headers:{'content-type':'application/json'}});};
- await a.run('runFramework()');assert.equal(calls,11);assert.equal(readings,1);
- input(a,'problemInput','Improve product discovery for returning shoppers.');await a.run('runFramework()');assert.equal(calls,21);assert.equal(readings,1,'unchanged documents must be read only once per page/model');
- a.run('clearWorkspace()');assert.equal(a.run('learnedCache'),null);a.close();
- console.log('PASS: ten-stage workbook; guided review; edits invalidate downstream outputs; resume; stale-loop cancellation; one-request streaming; CRLF/chunk/Unicode parsing; truncated and disconnected streams; invalid citations; document reuse; memory clearing. API responses simulated; no paid requests.');
+ let a=await app();
+ assert.equal(a.d.querySelectorAll('input[type=file],#pasteInput,#evidenceIntake,#engineMode').length,0);
+ assert.ok(!html.includes('document-workspace.js')&&!html.includes('browser-readers.js')&&!html.includes('cdn.jsdelivr'));
+ a.d.getElementById('cloudConsent').checked=false;a.run('updateRunBtn()');await a.run('runFramework()');assert.equal(a.requests.length,0);
+ a.d.getElementById('cloudConsent').checked=true;a.run('updateRunBtn()');await a.run('runFramework()');
+ assert.equal(a.run('completedSteps.length'),10);assert.equal(a.run('status'),'done');
+ assert.deepEqual(a.requests.map(r=>r.kind),['analysis','prototype','prd']);
+ assert.match(a.w.protoHtmlStore,/sandbox="allow-scripts"/);assert.match(a.w.prdStore,/Product Requirements Document/);
+ assert.match(a.requests[2].body.messages[0].content,/PROTOTYPE UI SUMMARY[\s\S]*Discovery prototype/);
+ assert.match(a.d.getElementById('doneBanner').textContent,/12 \/ 12/);
+ assert.match(a.run('results.metrics'),/Café/);assert.equal(a.run('pipelineBusy||deliverableBusy'),false);
+ assert.equal(a.w.localStorage.length+a.w.sessionStorage.length,0);
+ // Editing the final stage clears generated deliverables; editing an early stage invalidates downstream decisions.
+ a.d.querySelector('#content-metrics button').click();a.d.querySelector('#content-metrics textarea').value='New proposed success measures. Targets TBD.';
+ [...a.d.querySelectorAll('#content-metrics button')].find(b=>b.textContent==='Apply draft changes').click();
+ assert.equal(a.w.protoHtmlStore,'');assert.equal(a.w.prdStore,'');assert.equal(a.d.getElementById('prdBtn').disabled,true);
+ await a.run('generateDeliverables()');assert.match(a.w.prdStore,/Product Requirements/);
+ a.d.querySelector('#content-segments button').click();a.d.querySelector('#content-segments textarea').value='Returning mobile shoppers only.';
+ [...a.d.querySelectorAll('#content-segments button')].find(b=>b.textContent==='Apply draft changes').click();
+ assert.equal(a.run('completedSteps.length'),1);assert.equal(a.run('status'),'idle');assert.equal(a.w.prdStore,'');
+ await a.run('runFramework(true)');assert.equal(a.run('completedSteps.length'),10);assert.match(a.run('results.segments'),/Returning mobile/);a.close();
+ // Detailed mode performs 10 analysis requests, then prototype, then PRD.
+ a=await app();a.d.getElementById('runSpeed').value='detailed';await a.run('runFramework()');assert.equal(a.requests.length,12);assert.deepEqual(a.requests.slice(-2).map(r=>r.kind),['prototype','prd']);a.close();
+ // Guided mode carries feedback and only advances the current stage.
+ a=await app();a.d.getElementById('autoRun').checked=false;const guided=a.run('runFramework()');await tick();assert.equal(a.run('pausedStep'),'segments');
+ a.run("continueStep('metrics',false)");assert.equal(a.run('pausedStep'),'segments');
+ a.run("openFeedback('segments')");input(a,'note-segments','Focus on returning shoppers.');a.run("continueStep('segments',true)");await tick();assert.equal(a.run('pausedStep'),'painpoints');
+ assert.match(a.requests[1].body.messages[0].content,/Focus on returning shoppers/);
+ a.run('stopFramework()');await guided;assert.equal(a.run('completedSteps.length'),2);a.d.getElementById('autoRun').checked=true;await a.run('runFramework(true)');assert.equal(a.run('status'),'done');assert.ok(a.w.prdStore);a.close();
+ // A provider failure at either deliverable preserves analysis and completed outputs; resume retries only missing outputs.
+ for(const kind of ['prototype','prd']){
+  a=await app();a.failure={kind,status:429,message:'Rate limit fixture'};await a.run('runFramework()');
+  assert.equal(a.run('completedSteps.length'),10);assert.equal(a.w.prdStore,'');
+  assert.match(a.d.getElementById('runMessage').textContent,/generation failed/);
+  assert.equal(!!a.w.protoHtmlStore,kind==='prd');const count=a.requests.length;
+  await a.run('generateDeliverables()');assert.ok(a.w.prdStore);assert.equal(a.requests.length-count,kind==='prototype'?2:1);a.close();
+ }
+ // Cancellation during a deliverable cannot publish a stale response or strand the controls.
+ a=await app();a.failure={kind:'prototype',abort:true};const pending=a.run('runFramework()');while(!a.run('deliverableBusy'))await tick();a.run('stopFramework()');await pending;
+ assert.equal(a.run('completedSteps.length'),10);assert.equal(a.run('pipelineBusy||deliverableBusy'),false);assert.equal(a.w.protoHtmlStore,'');
+ assert.doesNotMatch(a.d.getElementById('protoActions').textContent,/Building/);await a.run('generateDeliverables()');assert.ok(a.w.prdStore);a.close();
+ // Interrupted stream keeps finished stages and never unlocks partial analysis.
+ a=await app();const ids=Array.from(a.run('STEPS.map(s=>s.id)'));const fetch=a.w.fetch;let first=true;
+ a.w.fetch=async(url,opts)=>{if(JSON.parse(opts.body).stream&&first){first=false;return sse(ids.slice(0,3),'max_tokens');}return fetch(url,opts);};
+ await a.run('runFramework()');assert.equal(a.run('status'),'error');assert.equal(a.run('completedSteps.length'),3);assert.equal(a.w.protoHtmlStore,'');await a.run('runFramework(true)');assert.ok(a.w.prdStore);a.close();
+ // Authentication failures are actionable and leave the brief editable.
+ a=await app();a.failure={kind:'analysis',status:401,message:'Invalid API key fixture'};await a.run('runFramework()');assert.equal(a.run('status'),'error');assert.match(a.d.getElementById('errorBanner').textContent,/Invalid API key/);assert.equal(a.d.getElementById('apiKeyInput').disabled,false);a.close();
+ console.log('PASS: problem → 10 stages → prototype → PRD; streaming; detailed/guided flows; feedback; edited-decision invalidation; auth/rate-limit failures; resume; cancellation; no upload UI or document dependencies. AI responses simulated.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
