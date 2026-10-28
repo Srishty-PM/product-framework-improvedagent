@@ -44,7 +44,7 @@ Marketplace prompts account for supply, demand and matching. B2B prompts disting
 
 ## Boundaries
 
-Proposals and prioritisation are drafts, not customer research or measured results. The agent labels assumptions and keeps missing facts, RICE inputs and success targets as TBD rather than inventing evidence. Review its reasoning and validate requirements before using them.
+Proposals and prioritisation are drafts, not customer research or measured results. The agent labels assumptions and keeps missing factual data and success targets as TBD. RICE uses provisional numeric planning estimates with a rationale for Reach, Impact, Confidence and Effort. The table is labelled **Indicative prioritisation — requires validation**. Reach, Impact and Effort use consistent relative 1–10 scales for the same next-quarter audience and team; Confidence uses 0–1. These are heuristic scores, not measured reach or outcome forecasts. The app recalculates `(Reach × Impact × Confidence) / Effort`, sorts the options, and carries that provisional ranking into prototype and PRD generation. Edited RICE tables are recalculated too. Review its reasoning and validate requirements before using them.
 
 The app is vanilla HTML/CSS/JavaScript using Anthropic's Messages API. `index.html` contains the interface, original stage prompts, provider connection and deliverable generators. `framework-runner.js` manages the connected run, streamed-stage parsing, editing, continuation and prototype isolation. No build step or backend is required. The default model is `claude-sonnet-4-6`; Advanced run options let you select another supported model available to your account.
 
