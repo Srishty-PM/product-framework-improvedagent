@@ -1,3 +1,4 @@
+const RICE_FIXTURE="| Solution | Reach (1-10) | Impact (1-10) | Confidence (0-1) | Effort (1-10) | RICE Score |\n|---|---|---|---|---|---|\n| Personalisation engine | 9 | 9 | 0.4 | 8 | 999 |\n| Guided discovery | 8 | 7 | 0.5 | 2 | 1 |\n\nAssumptions for a shared next-quarter audience and delivery team:\n- Personalisation engine: broad potential reach (9), strong possible impact (9), low confidence (0.4) without validated data, and high effort (8) for modelling. Validate data readiness and adoption.\n- Guided discovery: broad reach (8), useful impact (7), moderate confidence (0.5) from a simple mechanism, and low effort (2) using existing UI. Validate shopper demand and delivery estimates.";
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -25,7 +26,7 @@ let server,browser;
    if(failure===kind){failure=null;return route.fulfill({status:429,contentType:'application/json',body:JSON.stringify({error:{message:'Rate limit fixture'}})});}
    if(body.stream){
     const ids=prompt.match(/Use exactly these IDs in this order: ([\w, ]+)\./)[1].split(', ');
-    const events=ids.map(id=>({type:'content_block_delta',delta:{type:'text_delta',text:`<<<STAGE:${id}>>>\n## ${id}\nProposed approach for returning shoppers. RICE inputs and validation remain TBD.\n<<<END:${id}>>>\n`}}));
+    const events=ids.map(id=>({type:'content_block_delta',delta:{type:'text_delta',text:`<<<STAGE:${id}>>>\n## ${id}\n${id==='prioritisation'?RICE_FIXTURE:'Proposed approach for returning shoppers. Assumptions and targets remain TBD.'}\n<<<END:${id}>>>\n`}}));
     events.push({type:'message_delta',delta:{stop_reason:'end_turn'}},{type:'message_stop'});
     return route.fulfill({status:200,contentType:'text/event-stream',body:events.map(e=>`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join('')});
    }
@@ -48,6 +49,10 @@ let server,browser;
  assert.deepEqual(requests.map(r=>r.kind),['analysis','prototype','prd']);
  assert.equal(await page.evaluate(()=>completedSteps.length),10);
  assert.match(await page.locator('#doneBanner').innerText(),/12 \/ 12/);
+ const rice=await page.locator('#result-prioritisation').innerText();
+ assert.match(rice,/Indicative prioritisation/);assert.match(rice,/14.00/);assert.doesNotMatch(rice,/TBD/);
+ assert.match(requests[1].prompt,/Highest provisional score.*Guided discovery/);
+ assert.match(requests[2].prompt,/Highest provisional score.*Guided discovery/);
  assert.match(requests[2].prompt,/PROTOTYPE UI SUMMARY[\s\S]*Product discovery/);
  assert.equal(await page.locator('#protoFrame').getAttribute('sandbox'),'allow-scripts');
  const outer=page.frames().find(f=>f.parentFrame()===page.mainFrame());await outer.waitForSelector('iframe');
