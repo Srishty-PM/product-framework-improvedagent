@@ -16,7 +16,7 @@ let server,browser;
  browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE?{executablePath:process.env.CHROMIUM_EXECUTABLE,args:JSON.parse(process.env.CHROMIUM_ARGS||'[]')}:{})});
  const context=await browser.newContext({acceptDownloads:true,permissions:['clipboard-read','clipboard-write']});
  const page=await context.newPage(),errors=[],external=[],requests=[];
- let failure=null;
+ let failure=null;let prototypeLimits=0;
  page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  await context.route('**/*',async route=>{
   const url=route.request().url();if(url.startsWith('http://127.0.0.1:8767'))return route.continue();
@@ -24,14 +24,16 @@ let server,browser;
    const body=route.request().postDataJSON(),prompt=body.messages[0].content;
    const kind=prompt.includes('ONLY output raw HTML')?'prototype':prompt.startsWith('You are a senior PM writing a PRD')?'prd':'analysis';requests.push({kind,prompt});
    if(failure===kind){failure=null;return route.fulfill({status:429,contentType:'application/json',body:JSON.stringify({error:{message:'Rate limit fixture'}})});}
-   if(body.stream){
+   if(body.stream&&kind==='analysis'){
     const ids=prompt.match(/Use exactly these IDs in this order: ([\w, ]+)\./)[1].split(', ');
     const events=ids.map(id=>({type:'content_block_delta',delta:{type:'text_delta',text:`<<<STAGE:${id}>>>\n## ${id}\n${id==='prioritisation'?RICE_FIXTURE:'Proposed approach for returning shoppers. Assumptions and targets remain TBD.'}\n<<<END:${id}>>>\n`}}));
     events.push({type:'message_delta',delta:{stop_reason:'end_turn'}},{type:'message_stop'});
     return route.fulfill({status:200,contentType:'text/event-stream',body:events.map(e=>`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join('')});
    }
+   if(kind==='prototype'&&prototypeLimits>0){prototypeLimits--;return route.fulfill({status:200,contentType:'text/event-stream',body:'event: content_block_delta\ndata: '+JSON.stringify({type:'content_block_delta',delta:{type:'text_delta',text:'<!DOCTYPE html><html><body>UNFINISHED_PROTOTYPE'}})+'\n\nevent: message_delta\ndata: '+JSON.stringify({type:'message_delta',delta:{stop_reason:'max_tokens'}})+'\n\nevent: message_stop\ndata: '+JSON.stringify({type:'message_stop'})+'\n\n'});}
    const proto='<!DOCTYPE html><html><body><h1>Product discovery</h1><button onclick="document.getElementById(\'detail\').hidden=false">Explore products</button><section id="detail" hidden>Recommended products</section><img src="https://example.com/leak"><script>fetch("https://example.com/leak-data").catch(()=>{})</script></body></html>';
    const text=kind==='prototype'?proto:'# Product Requirements Document\n## Overview\nExplore products for returning shoppers.\n## Functional Requirements\nGiven an eligible shopper, when they select Explore products, show recommended products.\n## Open Questions\nSuccess targets are TBD.';
+   if(kind==='prototype'&&body.stream){const events=[{type:'content_block_delta',delta:{type:'text_delta',text}},{type:'message_delta',delta:{stop_reason:'end_turn'}},{type:'message_stop'}];return route.fulfill({status:200,contentType:'text/event-stream',body:events.map(e=>`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join('')});}
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({content:[{type:'text',text}],stop_reason:'end_turn'})});
   }
   external.push(url);return route.abort();
@@ -65,6 +67,10 @@ let server,browser;
  event=page.waitForEvent('download');await page.getByRole('button',{name:'↓ Download .md',exact:true}).click();const prd=await event;
  assert.match(fs.readFileSync(await prd.path(),'utf8'),/Product Requirements Document/);
  assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
+ // A clipped prototype stream is automatically retried with a smaller scope; analysis is not repeated.
+ prototypeLimits=1;const recoveryStart=requests.length;await page.locator('#runBtn').click();await page.waitForFunction(()=>status==='done'&&!pipelineBusy&&!!window.prdStore);
+ assert.deepEqual(requests.slice(recoveryStart).map(r=>r.kind),['analysis','prototype','prototype','prd']);
+ assert.doesNotMatch(await page.evaluate(()=>window.protoHtmlStore),/UNFINISHED_PROTOTYPE/);
  // Failed PRD: preserve the prototype and rerun only the missing PRD.
  failure='prd';await page.locator('#runBtn').click();await page.waitForFunction(()=>status==='done'&&!pipelineBusy&&!window.prdStore&&!!window.protoHtmlStore);
  const before=requests.length;await page.locator('#resumeDeliverables').click();await page.waitForFunction(()=>!pipelineBusy&&!!window.prdStore);

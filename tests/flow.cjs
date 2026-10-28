@@ -15,18 +15,20 @@ async function app(){
  const w=dom.window,ctx=dom.getInternalVMContext();
  w.TextDecoder=TextDecoder;w.AbortController=AbortController;w.confirm=()=>true;
  vm.runInContext(inline,ctx);vm.runInContext(runner,ctx);await tick();
- const a={w,d:w.document,run:s=>vm.runInContext(s,ctx),close:()=>dom.window.close(),requests:[],failure:null};
+ const a={w,d:w.document,run:s=>vm.runInContext(s,ctx),close:()=>dom.window.close(),requests:[],failure:null,prototypeModes:[]};
  a.w.fetch=async(url,opts)=>{
   const body=JSON.parse(opts.body),prompt=body.messages[0].content;
   const kind=prompt.includes('ONLY output raw HTML')?'prototype':prompt.startsWith('You are a senior PM writing a PRD')?'prd':'analysis';
   a.requests.push({kind,body});
   assert.equal(url,'https://api.anthropic.com/v1/messages');
   if(a.failure?.kind===kind){const f=a.failure;a.failure=null;if(f.abort)return await new Promise((resolve,reject)=>opts.signal.addEventListener('abort',()=>reject(new w.DOMException('Aborted','AbortError'))));return new Response(JSON.stringify({error:{message:f.message||'Fixture provider error'}}),{status:f.status||429,headers:{'content-type':'application/json'}});}
-  if(body.stream){
+  if(body.stream&&kind==='analysis'){
    const ids=prompt.match(/Use exactly these IDs in this order: ([\w, ]+)\./)[1].split(', ');
    return sse(ids);
   }
+  if(kind==='prototype'&&a.prototypeModes.length){const mode=a.prototypeModes.shift();return textStream('<!DOCTYPE html><html><body>UNFINISHED_PROTOTYPE',mode==='limit'?'max_tokens':'end_turn');}
   const text=kind==='analysis'&&prompt.includes('Produce a useful provisional RICE ranking')?RICE_FIXTURE:kind==='prototype'?proto:kind==='prd'?'# Product Requirements Document\n## Overview\nDiscovery prototype and Explore products flow.\n## Functional Requirements\nGiven an eligible shopper, when they choose Explore products, then show matching products.\n## Open Questions\nTargets remain TBD; RICE is indicative.':'## Draft\nCandidate approach based on the problem statement. Assumptions and metrics TBD.';
+  if(kind==='prototype'&&body.stream)return textStream(text);
   return new Response(JSON.stringify({content:[{type:'text',text}],stop_reason:'end_turn'}),{headers:{'content-type':'application/json'}});
  };
  input(a,'problemInput','Improve product discovery for mobile marketplace shoppers.');input(a,'apiKeyInput','sk-ant-fixture-only-not-real');a.d.getElementById('cloudConsent').checked=true;a.run('updateRunBtn()');
@@ -39,6 +41,12 @@ function sse(ids,reason='end_turn'){
  events.push({type:'message_delta',delta:{stop_reason:reason}},{type:'message_stop'});
  const bytes=new TextEncoder().encode(events.map(e=>`event: ${e.type}\r\ndata: ${JSON.stringify(e)}\r\n\r\n`).join(''));let offset=0;
  return new Response(new ReadableStream({pull(c){if(offset>=bytes.length){c.close();return;}const end=Math.min(bytes.length,offset+11);c.enqueue(bytes.slice(offset,end));offset=end;}}),{headers:{'content-type':'text/event-stream'}});
+}
+function textStream(text,reason='end_turn'){
+ const events=[];for(let i=0;i<text.length;i+=13)events.push({type:'content_block_delta',delta:{type:'text_delta',text:text.slice(i,i+13)}});
+ events.push({type:'message_delta',delta:{stop_reason:reason}},{type:'message_stop'});
+ const wire=events.map(e=>`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join('');
+ return new Response(new ReadableStream({start(c){c.enqueue(new TextEncoder().encode(wire));c.close();}}),{headers:{'content-type':'text/event-stream'}});
 }
 (async()=>{
  let a=await app();
@@ -97,7 +105,26 @@ function sse(ids,reason='end_turn'){
  a=await app();const ids=Array.from(a.run('STEPS.map(s=>s.id)'));const fetch=a.w.fetch;let first=true;
  a.w.fetch=async(url,opts)=>{if(JSON.parse(opts.body).stream&&first){first=false;return sse(ids.slice(0,3),'max_tokens');}return fetch(url,opts);};
  await a.run('runFramework()');assert.equal(a.run('status'),'error');assert.equal(a.run('completedSteps.length'),3);assert.equal(a.w.protoHtmlStore,'');await a.run('runFramework(true)');assert.ok(a.w.prdStore);a.close();
+ // The screenshot failure: recover a truncated or incomplete prototype automatically, without redoing analysis.
+ for(const mode of ['limit','incomplete']){
+  a=await app();a.prototypeModes=[mode];await a.run('runFramework()');
+  assert.deepEqual(a.requests.map(r=>r.kind),['analysis','prototype','prototype','prd']);
+  assert.equal(a.run('completedSteps.length'),10);assert.ok(a.w.prdStore);assert.doesNotMatch(a.w.protoHtmlStore,/UNFINISHED_PROTOTYPE/);
+  assert.equal(a.requests[1].body.max_tokens,12000);assert.equal(a.requests[1].body.stream,true);
+  assert.match(a.requests[2].body.messages[0].content,/COMPACT RECOVERY/);a.close();
+ }
+ // Recovery is bounded; a second clipped response keeps analysis and exposes a clear retry.
+ a=await app();a.prototypeModes=['limit','limit'];await a.run('runFramework()');
+ assert.deepEqual(a.requests.map(r=>r.kind),['analysis','prototype','prototype']);assert.equal(a.w.protoHtmlStore,'');assert.equal(a.w.prdStore,'');
+ assert.match(a.d.getElementById('protoActions').textContent,/output limit/);assert.doesNotMatch(a.d.getElementById('protoActions').textContent,/Detailed/);
+ assert.equal(a.d.getElementById('prdBtn').disabled,true);assert.match(a.d.getElementById('prdBtn').textContent,/Waiting for prototype/);
+ const attempts=a.requests.length;await a.run('generateDeliverables()');assert.ok(a.w.prdStore);assert.equal(a.requests.length-attempts,2);a.close();
+ // Stop during compact recovery aborts cleanly and cannot publish the partial first attempt.
+ a=await app();a.prototypeModes=['limit'];const baseFetch=a.w.fetch;let protoRequests=0;
+ a.w.fetch=async(url,opt)=>{if(JSON.parse(opt.body).messages[0].content.includes('ONLY output raw HTML')&&++protoRequests===2)return await new Promise((resolve,reject)=>opt.signal.addEventListener('abort',()=>reject(new a.w.DOMException('Aborted','AbortError'))));return baseFetch(url,opt);};
+ const recovering=a.run('runFramework()');while(protoRequests<2)await tick();a.run('stopFramework()');await recovering;
+ assert.equal(a.w.protoHtmlStore,'');assert.equal(a.run('pipelineBusy||deliverableBusy'),false);a.close();
  // Authentication failures are actionable and leave the brief editable.
  a=await app();a.failure={kind:'analysis',status:401,message:'Invalid API key fixture'};await a.run('runFramework()');assert.equal(a.run('status'),'error');assert.match(a.d.getElementById('errorBanner').textContent,/Invalid API key/);assert.equal(a.d.getElementById('apiKeyInput').disabled,false);a.close();
- console.log('PASS: problem → 10 stages → prototype → PRD; streaming; detailed/guided flows; feedback; edited-decision invalidation; auth/rate-limit failures; resume; cancellation; no upload UI or document dependencies. Numeric RICE estimates, arithmetic and downstream ranking verified. AI responses simulated.');
+ console.log('PASS: problem → 10 stages → prototype → PRD; streaming; detailed/guided flows; feedback; edited-decision invalidation; auth/rate-limit failures; resume; cancellation; no upload UI or document dependencies. Numeric RICE and prototype limit/incomplete-HTML recovery verified. AI responses simulated.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
