@@ -71,6 +71,37 @@ function prepareStageDraft(stepId,text) {
 function deliverableContext() {
   return `\n\nCONTEXT POLICY: ${ANALYSIS_POLICY}\nPM NOTES:\n${getNotesContext()}\nFULL FRAMEWORK:\n${JSON.stringify(results)}`;
 }
+function outputLimitError() {
+  const error=new Error('Claude reached the output limit. Incomplete content was not accepted. Retry the remaining output; completed analysis is kept.');
+  error.code='OUTPUT_LIMIT';return error;
+}
+async function generatePrototypeSource(prompt,generation) {
+  // Never execute partial HTML. One compact retry recovers a clipped/incomplete response.
+  for(let attempt=0;attempt<2;attempt++) {
+    if(abortFlag||generation!==runGeneration)throw new Error('Prototype generation stopped.');
+    let characters=0;
+    const onText=chunk=>{
+      if(abortFlag||generation!==runGeneration)return;
+      characters+=chunk.length;
+      const label=document.querySelector('#protoActions .deliverable-status');
+      if(label)label.textContent=` ${attempt?'Building compact prototype':'Building prototype'}… ${characters.toLocaleString()} characters received`;
+    };
+    const request=attempt?prompt+'\n\nCOMPACT RECOVERY: The previous generation was too long or incomplete. Start again with a COMPLETE two-screen prototype under 2,500 output tokens. Use short shared CSS and minimal vanilla JS, no SVG/base64/images or decorative repetition. Implement the primary interaction, back/next buttons and closing </html>. ONLY output raw HTML.':prompt;
+    try {
+      const html=await callAI(request,12000,onText,300000);
+      if(!/(?:<!DOCTYPE html>|<html\b)[\s\S]*<\/html>/i.test(html)){
+        const error=new Error('Claude did not return complete HTML. Retry remaining deliverables; the analysis is kept.');error.code='INCOMPLETE_HTML';throw error;
+      }
+      return html;
+    }catch(error){
+      if(abortFlag||generation!==runGeneration)throw error;
+      if(attempt===1||!['OUTPUT_LIMIT','INCOMPLETE_HTML'].includes(error.code))throw error;
+      message('The prototype response was incomplete. Retrying once with a smaller, complete design; your analysis is kept.');
+      const label=document.querySelector('#protoActions .deliverable-status');
+      if(label)label.textContent=' Retrying a more compact prototype…';
+    }
+  }
+}
 function beginDeliverable(label) {
   deliverableBusy=true; setIntakeLocked(true);
   document.getElementById('btnRow').innerHTML='<button class="btn btn-stop" onclick="stopFramework()">■ Stop</button>';
